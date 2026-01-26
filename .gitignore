@@ -1,0 +1,12 @@
+*.class
+# Bỏ qua thư viện cài đặt
+node_modules/
+
+# Bỏ qua file dữ liệu Excel nếu bạn không muốn lộ
+*.xlsx
+
+# Bỏ qua các file log
+npm-debug.log*
+
+# Bỏ qua file môi trường bí mật
+.env
