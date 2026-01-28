@@ -1,68 +1,107 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #0c120f;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  --primary-green: #00d56c;
+  --primary-glow: rgba(0, 213, 108, 0.4);
+  --dark-bg: #0c120f;
+  --card-bg: rgba(20, 31, 26, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --border-color: rgba(255, 255, 255, 0.08);
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  background: #0c120f;
+  color: #fff;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+#root {
+  width: 100%;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-green);
+}
+
+/* Ant Design Global Overrides */
+.ant-layout {
+  background: #0c120f !important;
+}
+
+.ant-layout-sider {
+  background: #0c120f !important;
+  border-right: 1px solid var(--border-color) !important;
+  z-index: 1001;
+}
+
+.ant-layout-content {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.ant-menu-dark {
+  background: transparent !important;
+}
+
+.ant-menu-dark.ant-menu-inline .ant-menu-item {
+  border-radius: 10px !important;
+  margin: 8px 12px !important;
+  width: calc(100% - 24px) !important;
+  color: #888;
+}
+
+.ant-menu-dark.ant-menu-inline .ant-menu-item-selected {
+  background: var(--primary-green) !important;
+  color: #000 !important;
+  box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+.ant-menu-dark.ant-menu-inline .ant-menu-item-selected .anticon {
+  color: #000 !important;
+}
+
+/* Modal and Message styling */
+.ant-message-notice-content {
+  background: #1a2a22 !important;
+  color: #fff !important;
+  border: 1px solid var(--primary-green) !important;
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
   }
-  a:hover {
-    color: #747bff;
+
+  .mobile-only {
+    display: block !important;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
   }
 }
