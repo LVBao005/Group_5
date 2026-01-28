@@ -3,7 +3,6 @@
 node_modules/
 
 # Bỏ qua file dữ liệu Excel nếu bạn không muốn lộ
-*.xlsx
 
 # Bỏ qua các file log
 npm-debug.log*
