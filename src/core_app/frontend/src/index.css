@@ -1,107 +1,68 @@
-:root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0c120f;
+@layer base {
+    :root {
+        --background: 154 44% 4%;
+        /* #060d0a */
+        --foreground: 154 10% 98%;
+        --card: 154 44% 6%;
+        --card-foreground: 154 10% 98%;
+        --popover: 154 44% 5%;
+        --popover-foreground: 154 10% 98%;
+        --primary: 150 100% 50%;
+        /* Neon Green #00ff80 */
+        --primary-foreground: 154 44% 4%;
+        --secondary: 154 20% 15%;
+        --secondary-foreground: 154 10% 98%;
+        --muted: 154 20% 12%;
+        --muted-foreground: 154 10% 60%;
+        --accent: 150 100% 50%;
+        --accent-foreground: 154 10% 98%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 154 20% 15%;
+        --input: 154 20% 12%;
+        --ring: 150 100% 50%;
+        --radius: 1rem;
+    }
 
-  --primary-green: #00d56c;
-  --primary-glow: rgba(0, 213, 108, 0.4);
-  --dark-bg: #0c120f;
-  --card-bg: rgba(20, 31, 26, 0.8);
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --border-color: rgba(255, 255, 255, 0.08);
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
 }
 
-body {
-  margin: 0;
-  background: #0c120f;
-  color: #fff;
-  min-height: 100vh;
-}
+@layer utilities {
+    .neon-shadow {
+        box-shadow: 0 0 15px rgba(0, 255, 128, 0.4);
+    }
 
-#root {
-  width: 100%;
-}
+    .neon-text-shadow {
+        text-shadow: 0 0 8px rgba(0, 255, 128, 0.6);
+    }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+    .bg-glass {
+        background: rgba(10, 25, 18, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 255, 128, 0.1);
+    }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-green);
-}
-
-/* Ant Design Global Overrides */
-.ant-layout {
-  background: #0c120f !important;
-}
-
-.ant-layout-sider {
-  background: #0c120f !important;
-  border-right: 1px solid var(--border-color) !important;
-  z-index: 1001;
-}
-
-.ant-layout-content {
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-.ant-menu-dark {
-  background: transparent !important;
-}
-
-.ant-menu-dark.ant-menu-inline .ant-menu-item {
-  border-radius: 10px !important;
-  margin: 8px 12px !important;
-  width: calc(100% - 24px) !important;
-  color: #888;
-}
-
-.ant-menu-dark.ant-menu-inline .ant-menu-item-selected {
-  background: var(--primary-green) !important;
-  color: #000 !important;
-  box-shadow: 0 4px 15px var(--primary-glow);
-}
-
-.ant-menu-dark.ant-menu-inline .ant-menu-item-selected .anticon {
-  color: #000 !important;
-}
-
-/* Modal and Message styling */
-.ant-message-notice-content {
-  background: #1a2a22 !important;
-  color: #fff !important;
-  border: 1px solid var(--primary-green) !important;
-}
-
-/* Responsive Utilities */
-@media (max-width: 768px) {
-  .desktop-only {
-    display: none !important;
-  }
-
-  .mobile-only {
-    display: block !important;
-  }
-}
-
-@media (min-width: 769px) {
-  .mobile-only {
-    display: none !important;
-  }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+    }
 }
