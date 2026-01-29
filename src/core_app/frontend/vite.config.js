@@ -14,13 +14,20 @@ export default defineConfig({
         },
     },
     server: {
-        host: true, // Cho phép truy cập từ mạng nội bộ
+        host: true,
         port: 5173,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8080/backend',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, ''),
+            },
+        },
         watch: {
-            usePolling: true, // Cần thiết nếu bạn đang code trên một số hệ thống file đặc biệt hoặc WSL
+            usePolling: true,
         },
         hmr: {
-            overlay: true, // Hiển thị lỗi ngay trên màn hình trình duyệt để bạn biết code sai ở đâu
+            overlay: true,
         }
     }
 })
