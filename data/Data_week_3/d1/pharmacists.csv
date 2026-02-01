@@ -1,0 +1,51 @@
+pharmacist_id,branch_id,full_name,license_number,username,password,role
+1,1,Kim Torphy III,Z2p88jEFjZ,Vaughn_Koss,jUEbYgdsh5bKywF,ADMIN
+2,2,Mary Bartell,fz95SLq0ig,Catharine_Kling29,mDwMbny8oT6T79b,STAFF
+3,3,Joanna Grant,SY6jU2jxgD,Justyn.Reynolds,KCzqkeLCE8cjSA1,ADMIN
+4,4,Marcus Torphy,4DOj4lsPRA,Edythe.Bauch16,zZR5XeDJYgwqFlo,ADMIN
+5,5,Mae Effertz,c23GwMFh4s,Fletcher_Kuhlman,WgQwPWM2KEfAytc,STAFF
+6,1,Edward Streich,9pxszdZq5w,Jayden.Nader,uLSYZLw97WpAJ0P,ADMIN
+7,2,Wendy Gutmann,KNdj0RNw1g,Rachel71,2PtSHtzmRCG4gI8,ADMIN
+8,3,Velma Windler,sWw6qG4M0e,Gia59,OitGMSpafigVfUV,ADMIN
+9,4,Yvonne Stroman,8lSI5pjnBk,Nicole.Rosenbaum,GAJs51iHQGHlDy1,ADMIN
+10,5,Cathy Dibbert,cMvGqewiAg,Devonte23,MeXnFGkKv69Wb2P,ADMIN
+11,1,Jack Ondricka,RFWi05td3n,Immanuel_Satterfield42,oaCPTHWxxhHNH_M,STAFF
+12,2,Alexis Christiansen,rS5XDSWDjk,Florine.Klein93,H8lbOaBrrFS7K2D,ADMIN
+13,3,Lela Lueilwitz,CG1MCcA8h9,Salvatore57,brsnAEflwaUNB9_,STAFF
+14,4,Gwendolyn Rohan,dh3LM086pa,Jalen11,aDlSquyO6qeyfrZ,STAFF
+15,5,Austin Aufderhar,GKTnOzD20m,Braxton.Botsford72,wepPx3uvPS66OWi,ADMIN
+16,1,Mercedes Kunde,VGMP8bUbsQ,Tyreek_Vandervort76,HnSUNNKBUHOS5aj,STAFF
+17,2,Roberta Sipes,4tkwVOS7ZN,Lela.Harber,h6UiIL5v3T4durw,ADMIN
+18,3,Melba Abshire,AW0Z4dtLRB,Verlie_Pollich,IWPn8WFMX6OllOy,ADMIN
+19,4,Martha Parker,8Odkq9zEFv,Alexis_Hand,aExeHiHzXzWkCZU,ADMIN
+20,5,Jack Bayer,maoD3dMBsz,Aliza2,hQGssi3nukoFpqF,STAFF
+21,1,Wilma Keeling MD,k8xddpE8Rf,Margret_Ritchie,7eJeDKecp7Jg_il,ADMIN
+22,2,Delia Goldner,dwVhQEQCzU,Coleman.Roob-DuBuque,G23eOjEPFkq4wia,ADMIN
+23,3,Marvin Wiegand,dvkmArAI0x,Aryanna_Stroman,0UnE_OG3ciamLz7,STAFF
+24,4,Ms. Alberta Lueilwitz,jPjyWEGgFE,Skye_Lockman,mb8xmqPQBrXjRKQ,STAFF
+25,5,Chad Padberg,gOYNC0AG5p,Deonte73,V5xP4Li8rse36oL,STAFF
+26,1,Pat Kulas I,vDtJTm0wUE,Alva.Swift,KEUjyhCysPBfFhl,ADMIN
+27,2,Dr. Morris Lowe,aQXeu0HILP,Carissa_Crist36,YncTz0bineQHbEE,ADMIN
+28,3,Ida Graham,lUHxV6lroJ,Cornell_Friesen,DwikMASzMF0CSeZ,ADMIN
+29,4,Dr. Janis Erdman DDS,ENjWCjK8wk,Madge_Leuschke,2DGaF71FBnDX84g,ADMIN
+30,5,Ellen Treutel,jK6wYwjwO3,Alysa.Breitenberg14,SlBVU8kzss8Clgl,ADMIN
+31,1,Tony Jakubowski,6GcZZo0SX2,Destany.Goodwin,mf9JUbTJrLttkH7,STAFF
+32,2,Ben Kutch DVM,qETR9mWU3i,Alverta95,fyodjmWbTKQnDtt,ADMIN
+33,3,Thelma Streich MD,KrHQlfG2bO,Daniela8,uiMRlAyoT8ldC5U,STAFF
+34,4,Krista Breitenberg,pd5ZCOzL10,Johan_Bogisich61,iV6LpkdQlLDzv7A,ADMIN
+35,5,Ken McDermott,xgoWgMy2SO,Minnie_Strosin,6vKzWnlGtuxfB74,STAFF
+36,1,Lonnie Orn DDS,KxVwwnKoay,Ed_Lindgren,cC9ouXhNBIeik4q,STAFF
+37,2,Sam Bahringer,7yEcMQE1sU,Layla.Zboncak,76rYqN5SFMYG8Da,STAFF
+38,3,Helen Barton-Bogisich,jQ4PvB5TDi,Donavon6,WCLYNEGDl1AVUpy,ADMIN
+39,4,Ivan Halvorson,2dJ1PXRwKH,Orval57,cdqd2ztk5bJGBVr,ADMIN
+40,5,Gilberto Weissnat,gxrZdAiGut,Elody_Torphy,NTZKEkNv1i7zWSL,STAFF
+41,1,Alicia Hoppe,kF9TIpfdZj,Flavio_Hills,OkkDiTwR_kuCi15,STAFF
+42,2,Clay Deckow,8Mqq79kdtY,Nathaniel_Hauck38,7W741XnzBQaSIml,STAFF
+43,3,Wesley Sporer,4dpy1KfmRK,Isac.Bailey,S5tIB0AoiYsNqG3,ADMIN
+44,4,Julio Kulas DDS,dVdbovLgTB,Marvin.Cassin75,bOZ2wqv1okcZwOg,ADMIN
+45,5,Dr. Lynn Rosenbaum,Kc1H0uvomE,Saul79,v3nbAKMSAoshQxo,STAFF
+46,1,Geraldine Bergstrom,3W95eduQjN,Novella_Wehner,cgOlK9LbFyLkpUS,STAFF
+47,2,Mabel Daniel,5gPqzQTvgO,Nolan.Wehner,HRPUwXg654CvEeg,ADMIN
+48,3,Willard Crona,68GrlPesW4,Vidal18,JXO9_z8sqjWTiZg,STAFF
+49,4,Mr. Dwight Kshlerin,cyRF4miKCR,Sven37,sAQ1ZlKl_uHHx5t,STAFF
+50,5,Kelley Miller,3aijFjwob4,Assunta_Grady,upPQDPgwcMu6TlG,ADMIN
