@@ -180,7 +180,7 @@ const dashboardService = {
         }
 
         try {
-            const response = await axios.get('/api/dashboard/stats');
+            const response = await axios.get('/dashboard/stats');
             return response.data;
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
@@ -200,7 +200,7 @@ const dashboardService = {
         }
 
         try {
-            const response = await axios.get(`/api/dashboard/revenue-timeline?period=${period}`);
+            const response = await axios.get(`/dashboard/revenue-timeline?period=${period}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching revenue timeline:', error);
@@ -218,7 +218,7 @@ const dashboardService = {
         }
 
         try {
-            const response = await axios.get('/api/dashboard/revenue-by-category');
+            const response = await axios.get('/dashboard/revenue-by-category');
             return response.data;
         } catch (error) {
             console.error('Error fetching revenue by category:', error);
@@ -236,7 +236,7 @@ const dashboardService = {
         }
 
         try {
-            const response = await axios.get('/api/dashboard/alerts');
+            const response = await axios.get('/dashboard/alerts');
             return response.data;
         } catch (error) {
             console.error('Error fetching alerts:', error);
@@ -254,7 +254,7 @@ const dashboardService = {
         }
 
         try {
-            const response = await axios.get('/api/dashboard/realtime');
+            const response = await axios.get('/dashboard/realtime');
             return response.data;
         } catch (error) {
             console.error('Error fetching realtime data:', error);

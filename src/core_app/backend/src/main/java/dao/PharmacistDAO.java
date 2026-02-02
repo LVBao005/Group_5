@@ -77,6 +77,21 @@ public class PharmacistDAO {
         return null;
     }
 
+    public Pharmacist getPharmacistByUsername(String username) throws SQLException {
+        String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
+                "JOIN branches b ON p.branch_id = b.branch_id " +
+                "WHERE p.username = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return extractPharmacist(rs, true);
+                }
+            }
+        }
+        return null;
+    }
+
     private Pharmacist extractPharmacist(ResultSet rs, boolean includeJoined) throws SQLException {
         Pharmacist p = new Pharmacist();
         p.setPharmacistId(rs.getInt("pharmacist_id"));

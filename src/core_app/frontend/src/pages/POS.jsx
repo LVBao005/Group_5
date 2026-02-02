@@ -34,10 +34,12 @@ const POS = () => {
     const [cart, setCart] = useState([]);
     const [quantities, setQuantities] = useState({}); // Local state for cards quantity inputs
     const [selectedUnits, setSelectedUnits] = useState({}); // { [medicineId]: 'base' | 'sub' }
+    const [availableStock, setAvailableStock] = useState({}); // Track available stock for each medicine
     const [showInvoice, setShowInvoice] = useState(false);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [phone, setPhone] = useState('');
+    const [customerName, setCustomerName] = useState('');
 
     // Get current user and branch for the invoice
     const userStr = localStorage.getItem('user');
@@ -59,44 +61,75 @@ const POS = () => {
 
                 inventoryData.forEach(item => {
                     // Collect categories
-                    if (item.categoryId && item.categoryName) {
-                        cats.add(JSON.stringify({ category_id: item.categoryId, category_name: item.categoryName }));
+                    if (item.category_id && item.category_name) {
+                        cats.add(JSON.stringify({ category_id: item.category_id, category_name: item.category_name }));
                     }
 
-                    if (!grouped[item.medicineId]) {
-                        grouped[item.medicineId] = {
-                            medicine_id: item.medicineId,
-                            name: item.medicineName,
-                            base_unit: item.baseUnit,
-                            sub_unit: item.subUnit, // Add sub_unit
-                            base_sell_price: item.baseSellPrice || 0,
-                            sub_sell_price: item.subSellPrice || 0, // Add sub_sell_price
-                            conversion_rate: item.conversionRate || 1, // Add conversion_rate
-                            category_id: item.categoryId,
+                    if (!grouped[item.medicine_id]) {
+                        grouped[item.medicine_id] = {
+                            medicine_id: item.medicine_id,
+                            name: item.medicine_name,
+                            base_unit: item.base_unit,
+                            sub_unit: item.sub_unit,
+                            base_sell_price: item.base_sell_price || 0,
+                            sub_sell_price: item.sub_sell_price || 0,
+                            conversion_rate: item.conversion_rate || 1,
+                            category_id: item.category_id,
                             batches: [],
                             // Add image placeholder if needed, or mapping logic
                             image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
                         };
                     }
-                    grouped[item.medicineId].batches.push({
-                        batch_id: item.batchId,
-                        quantity_std: item.quantityStd,
-                        expiry_date: item.expiryDate,
-                        batch_number: item.batchNumber
+                    grouped[item.medicine_id].batches.push({
+                        batch_id: item.batch_id,
+                        quantity_std: item.quantity_std,
+                        expiry_date: item.expiry_date,
+                        batch_number: item.batch_number
                     });
                 });
 
                 // Finalize medicines list
                 const medicinesList = Object.values(grouped).map(m => {
-                    // Calculate total stock
-                    m.total_stock = m.batches.reduce((sum, b) => sum + b.quantity_std, 0);
+                    // Calculate total stock (sum all batches in BASE units)
+                    // If quantity_std seems to be in sub-units (abnormally high), convert it
+                    m.total_stock = m.batches.reduce((sum, b) => {
+                        let qty = b.quantity_std;
+                        
+                        // Auto-detect: If quantity seems to be in sub-units (too large), convert to base
+                        // Heuristic: If conversion_rate exists and quantity > 500, likely in sub-units
+                        if (m.conversion_rate && m.conversion_rate > 1 && qty > 500) {
+                            qty = Math.floor(qty / m.conversion_rate);
+                            console.warn(`⚠️ ${m.name}: Auto-converted ${b.quantity_std} → ${qty} ${m.base_unit} (÷${m.conversion_rate})`);
+                        }
+                        
+                        return sum + qty;
+                    }, 0);
+                    
                     // Sort batches by expiry (FIFO)
                     m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+                    
+                    // Debug: Log stock calculation for Hapacol
+                    if (m.name?.includes('Hapacol')) {
+                        console.log(`📦 ${m.name}:`, {
+                            batches: m.batches.length,
+                            quantities: m.batches.map(b => `Batch ${b.batch_number}: ${b.quantity_std}`),
+                            total: m.total_stock,
+                            conversion_rate: m.conversion_rate
+                        });
+                    }
+                    
                     return m;
                 });
 
                 setMedicines(medicinesList);
                 setCategories(Array.from(cats).map(c => JSON.parse(c)));
+                
+                // Initialize available stock (same as total_stock initially)
+                const stockMap = {};
+                medicinesList.forEach(m => {
+                    stockMap[m.medicine_id] = m.total_stock;
+                });
+                setAvailableStock(stockMap);
 
             } catch (error) {
                 console.error("Failed to load POS data", error);
@@ -159,26 +192,13 @@ const POS = () => {
         const price = isSub ? medicine.sub_sell_price : medicine.base_sell_price;
         const conversion = medicine.conversion_rate || 1;
 
-        // Calculate requested quantity in BASE units for stock check
+        // Calculate requested quantity in BASE units
         const requestedQuota = isSub ? Math.ceil(qty / conversion) : qty;
+        const currentAvailable = availableStock[medicine.medicine_id] || 0;
 
-        // Check existing cart items for total stock usage
-        const existingItems = cart.filter(item => item.medicine_id === medicine.medicine_id);
-        let currentStockUsed = 0;
-
-        existingItems.forEach(item => {
-            const itemIsSub = item.unit === medicine.sub_unit;
-            const itemQuota = itemIsSub ? Math.ceil(item.quantity / conversion) : item.quantity;
-            currentStockUsed += itemQuota;
-        });
-
-        // Simple check: This "quota" logic cleans up stock checking but is approximate for sub-units
-        // A better check is: (current_stock_used_in_base * conversion) + (current_sub_units) <= total_stock * conversion
-        // But for now, we'll stick to a simpler safe check:
-        // Total Base Units needed <= Total Stock
-
-        if (currentStockUsed + requestedQuota > medicine.total_stock) {
-            alert(`Không đủ tồn kho! Chỉ còn ${medicine.total_stock} ${medicine.base_unit}`);
+        // Check if enough stock available
+        if (requestedQuota > currentAvailable) {
+            alert(`Không đủ tồn kho! Chỉ còn ${currentAvailable} ${medicine.base_unit}`);
             return;
         }
 
@@ -200,8 +220,55 @@ const POS = () => {
             }]);
         }
 
+        // Deduct from available stock
+        setAvailableStock(prev => ({
+            ...prev,
+            [medicine.medicine_id]: prev[medicine.medicine_id] - requestedQuota
+        }));
+
         // Reset quantity
         setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 1 }));
+    };
+
+    const removeFromCart = (item) => {
+        // Find medicine to get conversion rate
+        const medicine = medicines.find(m => m.medicine_id === item.medicine_id);
+        if (!medicine) return;
+
+        const conversion = medicine.conversion_rate || 1;
+        const isSub = item.unit === medicine.sub_unit;
+        
+        // Calculate how much to restore in BASE units
+        const restoreQuota = isSub ? Math.ceil(item.quantity / conversion) : item.quantity;
+
+        // Restore stock
+        setAvailableStock(prev => ({
+            ...prev,
+            [item.medicine_id]: prev[item.medicine_id] + restoreQuota
+        }));
+
+        // Remove from cart
+        setCart(cart.filter(i => !(i.medicine_id === item.medicine_id && i.unit === item.unit)));
+    };
+
+    const clearCart = () => {
+        // Restore all stock
+        cart.forEach(item => {
+            const medicine = medicines.find(m => m.medicine_id === item.medicine_id);
+            if (!medicine) return;
+
+            const conversion = medicine.conversion_rate || 1;
+            const isSub = item.unit === medicine.sub_unit;
+            const restoreQuota = isSub ? Math.ceil(item.quantity / conversion) : item.quantity;
+
+            setAvailableStock(prev => ({
+                ...prev,
+                [item.medicine_id]: prev[item.medicine_id] + restoreQuota
+            }));
+        });
+
+        // Clear cart
+        setCart([]);
     };
 
     const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -214,6 +281,16 @@ const POS = () => {
 
     const confirmPayment = async () => {
         setLoading(true);
+
+        // Debug: Check user data
+        console.log('👤 Current user:', user);
+        
+        // Check if user is logged in (either pharmacist_id or username exists)
+        if (!user || (!user.pharmacist_id && !user.username)) {
+            alert('Lỗi: Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại!');
+            setLoading(false);
+            return;
+        }
 
         // Process cart allocations (FIFO)
         const detailsPayload = [];
@@ -254,15 +331,19 @@ const POS = () => {
         const payload = {
             branch_id: user?.branch_id || 1,
             pharmacist_id: user?.pharmacist_id || 1,
-            customer_id: null, // Backend can resolve by phone if provided
+            customer_phone: phone || null, // Send phone number to backend
+            customer_name: customerName || null, // Send customer name to backend
             total_amount: totalAmount,
-            sale_date: new Date().toISOString(),
+            is_simulated: false, // Real sale from POS
             details: detailsPayload
         };
 
+        console.log('💰 Creating invoice with payload:', payload);
+
         try {
             // Call the API service
-            await invoiceService.createInvoice(payload);
+            const response = await invoiceService.createInvoice(payload);
+            console.log('✅ Invoice created successfully:', response);
 
             // Success feedback
             setSuccess(true);
@@ -271,11 +352,16 @@ const POS = () => {
                 setShowInvoice(false);
                 setSuccess(false);
                 setPhone('');
+                setCustomerName('');
                 setLoading(false);
+                
+                // Reload inventory data to refresh stock
+                window.location.reload();
             }, 1500);
         } catch (error) {
-            console.error('API Error:', error);
-            alert('Lỗi khi đẩy dữ liệu xuống Backend! (Kiểm tra Console)');
+            console.error('❌ API Error:', error);
+            console.error('Error details:', error.response?.data || error.message);
+            alert(`Lỗi khi đẩy dữ liệu xuống Backend!\n${error.response?.data?.error || error.message}\n(Kiểm tra Console để biết thêm chi tiết)`);
             setLoading(false);
         }
     };
@@ -343,6 +429,13 @@ const POS = () => {
                             const selectedUnit = selectedUnits[medicine.medicine_id] || 'base';
                             const displayPrice = selectedUnit === 'sub' ? medicine.sub_sell_price : medicine.base_sell_price;
                             const displayUnit = selectedUnit === 'sub' ? medicine.sub_unit : medicine.base_unit;
+                            
+                            // Calculate available stock in the selected unit
+                            const baseStock = availableStock[medicine.medicine_id] || 0;
+                            const conversionRate = medicine.conversion_rate || 1;
+                            const displayStock = selectedUnit === 'sub' 
+                                ? Math.floor(baseStock * conversionRate)  // Convert to sub-units (e.g., 10 boxes * 100 = 1000 pills)
+                                : baseStock; // Keep as base units
 
                             return (
                                 <div key={medicine.medicine_id} className="bg-[#161a19] border border-white/5 rounded-3xl p-6 flex flex-col hover:border-[#00ff80]/30 transition-all group overflow-hidden relative">
@@ -351,8 +444,19 @@ const POS = () => {
                                         {medicine.category_name}
                                     </div>
 
-                                    <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>
-                                    <div className="flex items-baseline gap-1 mb-6">
+                                    <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>                                    
+                                    {/* Available Stock Display - Shows in selected unit */}
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <PackageSearch size={14} className="text-white/30" />
+                                        <span className={cn(
+                                            "text-xs font-bold",
+                                            displayStock === 0 ? "text-red-400" :
+                                            displayStock < (selectedUnit === 'sub' ? 100 : 10) ? "text-yellow-400" :
+                                            "text-white/50"
+                                        )}>
+                                            Còn: {displayStock} {displayUnit}
+                                        </span>
+                                    </div>                                    <div className="flex items-baseline gap-1 mb-6">
                                         <span className="text-xl font-black text-[#00ff80] tracking-tighter">{formatPrice(displayPrice)}</span>
                                         <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">VNĐ / {displayUnit}</span>
                                     </div>
@@ -390,9 +494,16 @@ const POS = () => {
                                         </div>
                                         <button
                                             onClick={() => addToCart(medicine)}
-                                            className="w-full bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[11px] py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
+                                            disabled={displayStock === 0}
+                                            className={cn(
+                                                "w-full font-black uppercase tracking-widest text-[11px] py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all",
+                                                displayStock === 0
+                                                    ? "bg-white/5 text-white/20 cursor-not-allowed border border-white/5"
+                                                    : "bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
+                                            )}
                                         >
-                                            <ShoppingCart size={16} strokeWidth={3} /> Thêm vào giỏ
+                                            <ShoppingCart size={16} strokeWidth={3} /> 
+                                            {displayStock === 0 ? "Hết hàng" : "Thêm vào giỏ"}
                                         </button>
                                     </div>
                                 </div>
@@ -470,7 +581,7 @@ const POS = () => {
                         </div>
                         {cart.length > 0 && (
                             <button
-                                onClick={() => setCart([])}
+                                onClick={clearCart}
                                 className="p-2.5 rounded-xl bg-red-500/10 text-red-500/60 hover:text-red-500 hover:bg-red-500/20 transition-all group flex items-center justify-center"
                                 title="Xóa tất cả"
                             >
@@ -501,7 +612,7 @@ const POS = () => {
                                             <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}</p>
                                         </div>
                                         <button
-                                            onClick={() => setCart(cart.filter(i => i.medicine_id !== item.medicine_id))}
+                                            onClick={() => removeFromCart(item)}
                                             className="bg-red-500/10 text-red-500 p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
                                         >
                                             <X size={14} />
@@ -518,7 +629,16 @@ const POS = () => {
                             <div className="relative group">
                                 <input
                                     type="text"
-                                    placeholder="Số điện thoại khách hàng"
+                                    placeholder="Tên khách hàng (tùy chọn)"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"
+                                />
+                            </div>
+                            <div className="relative group">
+                                <input
+                                    type="text"
+                                    placeholder="Số điện thoại khách hàng (tùy chọn)"
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     className="w-full bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"

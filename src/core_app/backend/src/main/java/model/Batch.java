@@ -10,6 +10,9 @@ public class Batch {
     private Date manufacturingDate;
     private Date expiryDate;
     private double importPricePackage;
+    private int initialQuantity;
+    private int currentTotalQuantity;
+    private java.sql.Timestamp importDate;
 
     // Joined fields
     private String medicineName;
@@ -25,13 +28,16 @@ public class Batch {
     }
 
     public Batch(int batchId, int medicineId, String batchNumber, Date manufacturingDate, Date expiryDate,
-            double importPricePackage) {
+            double importPricePackage, int initialQuantity, int currentTotalQuantity, java.sql.Timestamp importDate) {
         this.batchId = batchId;
         this.medicineId = medicineId;
         this.batchNumber = batchNumber;
         this.manufacturingDate = manufacturingDate;
         this.expiryDate = expiryDate;
         this.importPricePackage = importPricePackage;
+        this.initialQuantity = initialQuantity;
+        this.currentTotalQuantity = currentTotalQuantity;
+        this.importDate = importDate;
     }
 
     public int getBatchId() {
@@ -80,6 +86,30 @@ public class Batch {
 
     public void setImportPricePackage(double importPricePackage) {
         this.importPricePackage = importPricePackage;
+    }
+
+    public int getInitialQuantity() {
+        return initialQuantity;
+    }
+
+    public void setInitialQuantity(int initialQuantity) {
+        this.initialQuantity = initialQuantity;
+    }
+
+    public int getCurrentTotalQuantity() {
+        return currentTotalQuantity;
+    }
+
+    public void setCurrentTotalQuantity(int currentTotalQuantity) {
+        this.currentTotalQuantity = currentTotalQuantity;
+    }
+
+    public java.sql.Timestamp getImportDate() {
+        return importDate;
+    }
+
+    public void setImportDate(java.sql.Timestamp importDate) {
+        this.importDate = importDate;
     }
 
     public String getMedicineName() {

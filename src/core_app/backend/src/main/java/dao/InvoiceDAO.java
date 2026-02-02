@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import model.Invoice;
 import model.InvoiceDetail;
+import model.Customer;
 import utils.DBContext;
 
 import java.sql.*;
@@ -46,16 +47,46 @@ public class InvoiceDAO {
             // Extract invoice data
             int branchId = jsonData.get("branch_id").getAsInt();
             int pharmacistId = jsonData.get("pharmacist_id").getAsInt();
-            Integer customerId = jsonData.has("customer_id") && !jsonData.get("customer_id").isJsonNull()
-                    ? jsonData.get("customer_id").getAsInt()
-                    : null;
             double totalAmount = jsonData.get("total_amount").getAsDouble();
             boolean isSimulated = jsonData.has("is_simulated") ? jsonData.get("is_simulated").getAsBoolean() : false;
 
-            // Insert invoice (Using source_type ENUM: 'MANUAL' or 'SIMULATED')
-            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, source_type) "
-                    +
-                    "VALUES (?, ?, ?, ?, ?)";
+            // Handle customer: resolve by phone or create new
+            Integer customerId = null;
+            if (jsonData.has("customer_phone") && !jsonData.get("customer_phone").isJsonNull()) {
+                String customerPhone = jsonData.get("customer_phone").getAsString();
+                if (customerPhone != null && !customerPhone.trim().isEmpty()) {
+                    CustomerDAO customerDAO = new CustomerDAO();
+                    Customer customer = customerDAO.getCustomerByPhone(customerPhone);
+                    
+                    if (customer == null) {
+                        // Create new customer with phone and optional name
+                        customer = new Customer();
+                        customer.setPhoneNumber(customerPhone);
+                        
+                        // Get customer name from request (optional)
+                        String customerName = null;
+                        if (jsonData.has("customer_name") && !jsonData.get("customer_name").isJsonNull()) {
+                            customerName = jsonData.get("customer_name").getAsString();
+                            if (customerName != null && !customerName.trim().isEmpty()) {
+                                customer.setCustomerName(customerName.trim());
+                            }
+                        }
+                        
+                        customerDAO.createCustomer(customer);
+                        
+                        // Get the newly created customer
+                        customer = customerDAO.getCustomerByPhone(customerPhone);
+                    }
+                    
+                    if (customer != null) {
+                        customerId = customer.getCustomerId();
+                    }
+                }
+            }
+
+            // Insert invoice
+            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, is_simulated) "
+                    + "VALUES (?, ?, ?, ?, ?)";
             psInvoice = conn.prepareStatement(sqlInvoice, Statement.RETURN_GENERATED_KEYS);
             psInvoice.setInt(1, branchId);
             psInvoice.setInt(2, pharmacistId);
@@ -65,7 +96,7 @@ public class InvoiceDAO {
                 psInvoice.setNull(3, Types.INTEGER);
             }
             psInvoice.setDouble(4, totalAmount);
-            psInvoice.setString(5, isSimulated ? "SIMULATED" : "MANUAL"); // Map boolean to ENUM
+            psInvoice.setBoolean(5, isSimulated);
 
             psInvoice.executeUpdate();
 
@@ -79,12 +110,11 @@ public class InvoiceDAO {
             // Insert invoice details
             JsonArray details = jsonData.getAsJsonArray("details");
             String sqlDetail = "INSERT INTO invoice_details (invoice_id, batch_id, unit_sold, quantity_sold, unit_price, total_std_quantity) "
-                    +
-                    "VALUES (?, ?, ?, ?, ?, ?)";
+                    + "VALUES (?, ?, ?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
-            // Update inventory (Use quantity_std)
-            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ?";
+            // Update inventory only (quantity_std per branch)
+            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ?";
             psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
 
             for (JsonElement detailElement : details) {
@@ -105,9 +135,10 @@ public class InvoiceDAO {
                 psDetail.setInt(6, totalStdQuantity);
                 psDetail.addBatch();
 
-                // Update inventory
+                // Update inventory (deduct stock at branch level)
                 psUpdateInventory.setInt(1, totalStdQuantity);
                 psUpdateInventory.setInt(2, batchId);
+                psUpdateInventory.setInt(3, branchId);
                 psUpdateInventory.addBatch();
             }
 
@@ -148,12 +179,12 @@ public class InvoiceDAO {
     /**
      * Get all invoices with optional filters
      */
-    public List<Invoice> getInvoices(String dateFrom, String dateTo, Integer pharmacistId, Boolean isSimulated)
+    public List<Invoice> getInvoices(String dateFrom, String dateTo, Integer pharmacistId, Integer branchId, Boolean isSimulated)
             throws SQLException {
         List<Invoice> invoices = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-                "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                        "i.total_amount, i.source_type, " +
+                "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
+                        "i.total_amount, i.is_simulated, " +
                         "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                         "FROM invoices i " +
                         "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -164,12 +195,12 @@ public class InvoiceDAO {
         List<Object> params = new ArrayList<>();
 
         if (dateFrom != null && !dateFrom.isEmpty()) {
-            sql.append("AND i.SALE_DATE >= ? ");
+            sql.append("AND i.invoice_date >= ? ");
             params.add(dateFrom);
         }
 
         if (dateTo != null && !dateTo.isEmpty()) {
-            sql.append("AND i.SALE_DATE <= ? ");
+            sql.append("AND i.invoice_date <= ? ");
             params.add(dateTo);
         }
 
@@ -178,12 +209,17 @@ public class InvoiceDAO {
             params.add(pharmacistId);
         }
 
-        if (isSimulated != null) {
-            sql.append("AND i.source_type = ? ");
-            params.add(isSimulated ? "SIMULATED" : "MANUAL");
+        if (branchId != null) {
+            sql.append("AND i.branch_id = ? ");
+            params.add(branchId);
         }
 
-        sql.append("ORDER BY i.SALE_DATE DESC");
+        if (isSimulated != null) {
+            sql.append("AND i.is_simulated = ? ");
+            params.add(isSimulated);
+        }
+
+        sql.append("ORDER BY i.invoice_date DESC");
 
         try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
             for (int i = 0; i < params.size(); i++) {
@@ -205,8 +241,8 @@ public class InvoiceDAO {
      * Get a specific invoice by ID with full details
      */
     public Invoice getInvoiceById(int invoiceId) throws SQLException {
-        String sql = "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.source_type, " +
+        String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
+                "i.total_amount, i.is_simulated, " +
                 "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -280,19 +316,19 @@ public class InvoiceDAO {
         StringBuilder sql = new StringBuilder(
                 "SELECT COUNT(*) as total_invoices, " +
                         "SUM(total_amount) as total_revenue, " +
-                        "SUM(CASE WHEN source_type = 'MANUAL' THEN 1 ELSE 0 END) as real_count, " +
-                        "SUM(CASE WHEN source_type = 'SIMULATED' THEN 1 ELSE 0 END) as simulated_count " +
+                        "SUM(CASE WHEN is_simulated = FALSE THEN 1 ELSE 0 END) as real_count, " +
+                        "SUM(CASE WHEN is_simulated = TRUE THEN 1 ELSE 0 END) as simulated_count " +
                         "FROM invoices WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
 
         if (dateFrom != null && !dateFrom.isEmpty()) {
-            sql.append("AND SALE_DATE >= ? ");
+            sql.append("AND invoice_date >= ? ");
             params.add(dateFrom);
         }
 
         if (dateTo != null && !dateTo.isEmpty()) {
-            sql.append("AND SALE_DATE <= ? ");
+            sql.append("AND invoice_date <= ? ");
             params.add(dateTo);
         }
 
@@ -320,8 +356,8 @@ public class InvoiceDAO {
     public List<Invoice> searchInvoices(String searchTerm) throws SQLException {
         List<Invoice> invoices = new ArrayList<>();
 
-        String sql = "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.source_type, " +
+        String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
+                "i.total_amount, i.is_simulated, " +
                 "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -330,7 +366,7 @@ public class InvoiceDAO {
                 "WHERE CAST(i.invoice_id AS VARCHAR) LIKE ? " +
                 "OR p.full_name LIKE ? " +
                 "OR c.customer_name LIKE ? " +
-                "ORDER BY i.SALE_DATE DESC";
+                "ORDER BY i.invoice_date DESC";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             String searchPattern = "%" + searchTerm + "%";
@@ -355,7 +391,7 @@ public class InvoiceDAO {
     private Invoice extractInvoiceFromResultSet(ResultSet rs) throws SQLException {
         Invoice invoice = new Invoice();
         invoice.setInvoiceId(rs.getInt("invoice_id"));
-        invoice.setInvoiceDate(rs.getTimestamp("SALE_DATE"));
+        invoice.setInvoiceDate(rs.getTimestamp("invoice_date"));
         invoice.setBranchId(rs.getInt("branch_id"));
         invoice.setPharmacistId(rs.getInt("pharmacist_id"));
 
@@ -365,7 +401,7 @@ public class InvoiceDAO {
         }
 
         invoice.setTotalAmount(rs.getDouble("total_amount"));
-        invoice.setIsSimulated("SIMULATED".equalsIgnoreCase(rs.getString("source_type")));
+        invoice.setIsSimulated(rs.getBoolean("is_simulated"));
         invoice.setBranchName(rs.getString("branch_name"));
         invoice.setPharmacistName(rs.getString("pharmacist_name"));
         invoice.setCustomerName(rs.getString("customer_name"));

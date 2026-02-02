@@ -12,6 +12,7 @@ public class Medicine {
     private int conversionRate;
     private double baseSellPrice;
     private double subSellPrice;
+    private int minStockLevel;
     private Timestamp createdAt;
 
     // Joined fields (optional, for display)
@@ -21,7 +22,7 @@ public class Medicine {
     }
 
     public Medicine(int medicineId, int categoryId, String name, String brand, String baseUnit, String subUnit,
-            int conversionRate, double baseSellPrice, double subSellPrice, Timestamp createdAt) {
+            int conversionRate, double baseSellPrice, double subSellPrice, int minStockLevel, Timestamp createdAt) {
         this.medicineId = medicineId;
         this.categoryId = categoryId;
         this.name = name;
@@ -31,6 +32,7 @@ public class Medicine {
         this.conversionRate = conversionRate;
         this.baseSellPrice = baseSellPrice;
         this.subSellPrice = subSellPrice;
+        this.minStockLevel = minStockLevel;
         this.createdAt = createdAt;
     }
 
@@ -104,6 +106,14 @@ public class Medicine {
 
     public void setSubSellPrice(double subSellPrice) {
         this.subSellPrice = subSellPrice;
+    }
+
+    public int getMinStockLevel() {
+        return minStockLevel;
+    }
+
+    public void setMinStockLevel(int minStockLevel) {
+        this.minStockLevel = minStockLevel;
     }
 
     public Timestamp getCreatedAt() {

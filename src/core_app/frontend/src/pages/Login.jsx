@@ -3,6 +3,7 @@ import { User, Eye, EyeOff, LogIn, Pill, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import { authService } from '../services/authService';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -15,30 +16,26 @@ const Login = () => {
         password: ''
     });
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
-        // Giả lập độ trễ network
-        setTimeout(() => {
-            // LOGIN GIẢ LẬP (MOCK)
-            if (formData.username === 'admin' && formData.password === '123') {
-                const mockUser = {
-                    id: 1,
-                    username: 'admin',
-                    fullName: 'Administrator',
-                    role: 'Pharmacist',
-                    branch_id: 1,
-                    pharmacist_id: 1
-                };
-                localStorage.setItem('user', JSON.stringify(mockUser));
+        try {
+            const response = await authService.login(formData.username, formData.password);
+            
+            if (response.success) {
+                // Đăng nhập thành công, chuyển đến trang POS
                 navigate('/pos');
             } else {
-                setError('Tài khoản hoặc mật khẩu không chính xác! (Thử: admin / 123)');
+                setError(response.error || 'Đăng nhập thất bại');
             }
+        } catch (err) {
+            console.error('Login error:', err);
+            setError(err.error || 'Không thể kết nối đến server');
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     return (

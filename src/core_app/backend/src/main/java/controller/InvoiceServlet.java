@@ -33,6 +33,7 @@ public class InvoiceServlet extends HttpServlet {
         this.invoiceDAO = new InvoiceDAO();
         this.gson = new GsonBuilder()
                 .setDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
                 .create();
     }
 
@@ -123,20 +124,26 @@ public class InvoiceServlet extends HttpServlet {
         String dateFrom = request.getParameter("dateFrom");
         String dateTo = request.getParameter("dateTo");
         String pharmacistIdStr = request.getParameter("pharmacistId");
+        String branchIdStr = request.getParameter("branchId");
         String isSimulatedStr = request.getParameter("isSimulated");
 
         Integer pharmacistId = null;
+        Integer branchId = null;
         Boolean isSimulated = null;
 
         if (pharmacistIdStr != null && !pharmacistIdStr.isEmpty()) {
             pharmacistId = Integer.parseInt(pharmacistIdStr);
         }
 
+        if (branchIdStr != null && !branchIdStr.isEmpty()) {
+            branchId = Integer.parseInt(branchIdStr);
+        }
+
         if (isSimulatedStr != null && !isSimulatedStr.isEmpty()) {
             isSimulated = Boolean.parseBoolean(isSimulatedStr);
         }
 
-        List<Invoice> invoices = invoiceDAO.getInvoices(dateFrom, dateTo, pharmacistId, isSimulated);
+        List<Invoice> invoices = invoiceDAO.getInvoices(dateFrom, dateTo, pharmacistId, branchId, isSimulated);
 
         PrintWriter out = response.getWriter();
         out.print(gson.toJson(invoices));

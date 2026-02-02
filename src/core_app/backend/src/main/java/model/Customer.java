@@ -4,14 +4,16 @@ public class Customer {
     private int customerId;
     private String phoneNumber;
     private String customerName;
+    private int points;
 
     public Customer() {
     }
 
-    public Customer(int customerId, String phoneNumber, String customerName) {
+    public Customer(int customerId, String phoneNumber, String customerName, int points) {
         this.customerId = customerId;
         this.phoneNumber = phoneNumber;
         this.customerName = customerName;
+        this.points = points;
     }
 
     public int getCustomerId() {
@@ -36,5 +38,13 @@ public class Customer {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public int getPoints() {
+        return points;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
     }
 }

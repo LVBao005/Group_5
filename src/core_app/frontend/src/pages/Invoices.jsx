@@ -34,6 +34,11 @@ const Invoices = () => {
     const [statusFilter, setStatusFilter] = useState('all'); // all, real, simulated
     const [showFilters, setShowFilters] = useState(false);
 
+    // Get current user and branch
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const currentBranchId = user?.branch_id || 1;
+
     // Load invoices from backend
     useEffect(() => {
         loadInvoices();
@@ -47,7 +52,8 @@ const Invoices = () => {
     const loadInvoices = async () => {
         try {
             setLoading(true);
-            const data = await invoiceService.getInvoices();
+            // Filter by current user's branch
+            const data = await invoiceService.getInvoices({ branchId: currentBranchId });
             setInvoices(data);
         } catch (error) {
             console.error('Error loading invoices:', error);
@@ -102,8 +108,16 @@ const Invoices = () => {
         setStatusFilter('all');
     };
 
-    const openInvoiceDetail = (invoice) => {
-        setSelectedInvoice(invoice);
+    const openInvoiceDetail = async (invoice) => {
+        try {
+            // Fetch full invoice details including invoice_details from backend
+            const fullInvoice = await invoiceService.getInvoiceById(invoice.invoice_id);
+            setSelectedInvoice(fullInvoice);
+        } catch (error) {
+            console.error('Error loading invoice details:', error);
+            // Fallback to the invoice from list (without details)
+            setSelectedInvoice(invoice);
+        }
     };
 
     const closeInvoiceDetail = () => {

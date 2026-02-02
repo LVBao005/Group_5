@@ -54,13 +54,13 @@ const Inventory = () => {
                 if (!masterMap.has(key)) {
                     masterMap.set(key, {
                         medicine_id: item.medicine_id,
-                        medicineName: item.medicineName,
-                        activeIngredient: item.activeIngredient || 'N/A',
-                        categoryName: item.categoryName,
-                        baseUnit: item.baseUnit,
-                        subUnit: item.subUnit,
-                        conversionRate: item.conversionRate,
-                        retailPrice: item.retailPrice || 0,
+                        medicineName: item.medicine_name,
+                        activeIngredient: item.active_ingredient || 'N/A',
+                        categoryName: item.category_name,
+                        baseUnit: item.base_unit,
+                        subUnit: item.sub_unit,
+                        conversionRate: item.conversion_rate,
+                        retailPrice: item.base_sell_price || 0,
                         brand: item.brand || 'Generic',
                         totalStock: 0,
                         batchCount: 0
@@ -68,23 +68,23 @@ const Inventory = () => {
                 }
                 
                 const master = masterMap.get(key);
-                master.totalStock += item.quantityStd || 0;
+                master.totalStock += item.quantity_std || 0;
                 master.batchCount += 1;
                 
                 batchList.push({
                     batch_id: item.batch_id,
                     medicine_id: item.medicine_id,
-                    medicineName: item.medicineName,
-                    batchNumber: item.batchNumber,
-                    importDate: item.importDate,
-                    expiryDate: item.expiryDate,
-                    quantityStd: item.quantityStd || 0,
-                    importPrice: item.importPrice || 0,
-                    baseUnit: item.baseUnit,
-                    subUnit: item.subUnit,
-                    conversionRate: item.conversionRate || 1,
-                    categoryName: item.categoryName,
-                    status: getExpiryStatus(item.expiryDate)
+                    medicineName: item.medicine_name,
+                    batchNumber: item.batch_number,
+                    importDate: item.import_date,
+                    expiryDate: item.expiry_date,
+                    quantityStd: item.quantity_std || 0,
+                    importPrice: item.import_price || 0,
+                    baseUnit: item.base_unit,
+                    subUnit: item.sub_unit,
+                    conversionRate: item.conversion_rate || 1,
+                    categoryName: item.category_name,
+                    status: getExpiryStatus(item.expiry_date)
                 });
             });
             

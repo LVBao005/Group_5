@@ -24,7 +24,10 @@ public class InventoryServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         this.inventoryDAO = new InventoryDAO();
-        this.gson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
+        this.gson = new GsonBuilder()
+                .setDateFormat("yyyy-MM-dd")
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                .create();
     }
 
     @Override

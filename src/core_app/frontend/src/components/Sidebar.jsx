@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import { MOCK_BRANCHES } from '../mockData';
 
 const Sidebar = () => {
     const location = useLocation();
@@ -20,9 +19,6 @@ const Sidebar = () => {
     // Get current user from localStorage
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
-
-    // Find branch name
-    const branch = MOCK_BRANCHES.find(b => b.branch_id === user?.branch_id);
 
     const handleLogout = () => {
         localStorage.removeItem('user');
@@ -86,9 +82,9 @@ const Sidebar = () => {
                         <User size={20} strokeWidth={2.5} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate uppercase">{user?.fullName || 'CHƯA ĐĂNG NHẬP'}</p>
+                        <p className="text-sm font-bold text-white truncate uppercase">{user?.fullName || user?.full_name || 'CHƯA ĐĂNG NHẬP'}</p>
                         <p className="text-[10px] text-emerald-500/60 uppercase tracking-wider font-bold truncate">
-                            {branch?.branch_name || 'Quầy số 01'}
+                            {user?.branchName || user?.branch_name || 'Quầy số 01'}
                         </p>
                     </div>
                     <button

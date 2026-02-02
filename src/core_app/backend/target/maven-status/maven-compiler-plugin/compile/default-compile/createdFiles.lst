@@ -19,6 +19,7 @@ filter\CorsFilter.class
 dao\MedicineDAO.class
 model\Customer.class
 model\Inventory.class
+controller\LoginServlet.class
 service\PharmacyService.class
 controller\InventoryServlet.class
 dao\PharmacistDAO.class
