@@ -53,7 +53,7 @@ public class InvoiceDAO {
             boolean isSimulated = jsonData.has("is_simulated") ? jsonData.get("is_simulated").getAsBoolean() : false;
 
             // Insert invoice (Using source_type ENUM: 'MANUAL' or 'SIMULATED')
-            String sqlInvoice = "INSERT INTO Invoices (branch_id, pharmacist_id, customer_id, total_amount, source_type) "
+            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, source_type) "
                     +
                     "VALUES (?, ?, ?, ?, ?)";
             psInvoice = conn.prepareStatement(sqlInvoice, Statement.RETURN_GENERATED_KEYS);
@@ -78,13 +78,13 @@ public class InvoiceDAO {
 
             // Insert invoice details
             JsonArray details = jsonData.getAsJsonArray("details");
-            String sqlDetail = "INSERT INTO Invoice_Details (invoice_id, batch_id, unit_sold, quantity_sold, unit_price, total_std_quantity) "
+            String sqlDetail = "INSERT INTO invoice_details (invoice_id, batch_id, unit_sold, quantity_sold, unit_price, total_std_quantity) "
                     +
                     "VALUES (?, ?, ?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
             // Update inventory (Use quantity_std)
-            String sqlUpdateInventory = "UPDATE Inventory SET quantity_std = quantity_std - ? WHERE batch_id = ?";
+            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ?";
             psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
 
             for (JsonElement detailElement : details) {
@@ -154,11 +154,11 @@ public class InvoiceDAO {
         StringBuilder sql = new StringBuilder(
                 "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
                         "i.total_amount, i.source_type, " +
-                        "b.branch_name, p.full_name as pharmacist_name, c.CUSTOMER_ID as customer_name " +
-                        "FROM Invoices i " +
-                        "LEFT JOIN Branches b ON i.branch_id = b.branch_id " +
-                        "LEFT JOIN Pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
-                        "LEFT JOIN Customers c ON i.customer_id = c.customer_id " +
+                        "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+                        "FROM invoices i " +
+                        "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
+                        "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
+                        "LEFT JOIN customers c ON i.customer_id = c.customer_id " +
                         "WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
@@ -207,11 +207,11 @@ public class InvoiceDAO {
     public Invoice getInvoiceById(int invoiceId) throws SQLException {
         String sql = "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
                 "i.total_amount, i.source_type, " +
-                "b.branch_name, p.full_name as pharmacist_name, c.CUSTOMER_ID as customer_name " +
-                "FROM Invoices i " +
-                "LEFT JOIN Branches b ON i.branch_id = b.branch_id " +
-                "LEFT JOIN Pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
-                "LEFT JOIN Customers c ON i.customer_id = c.customer_id " +
+                "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+                "FROM invoices i " +
+                "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
+                "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
+                "LEFT JOIN customers c ON i.customer_id = c.customer_id " +
                 "WHERE i.invoice_id = ?";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -240,10 +240,10 @@ public class InvoiceDAO {
 
         String sql = "SELECT id.detail_id, id.invoice_id, id.batch_id, id.unit_sold, " +
                 "id.quantity_sold, id.unit_price, id.total_std_quantity, " +
-                "m.medicine_name, b.batch_number, b.expiry_date " +
-                "FROM Invoice_Details id " +
-                "JOIN Batches b ON id.batch_id = b.batch_id " +
-                "JOIN Medicines m ON b.medicine_id = m.medicine_id " +
+                "m.name as medicine_name, b.batch_number, b.expiry_date " +
+                "FROM invoice_details id " +
+                "JOIN batches b ON id.batch_id = b.batch_id " +
+                "JOIN medicines m ON b.medicine_id = m.medicine_id " +
                 "WHERE id.invoice_id = ?";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -282,7 +282,7 @@ public class InvoiceDAO {
                         "SUM(total_amount) as total_revenue, " +
                         "SUM(CASE WHEN source_type = 'MANUAL' THEN 1 ELSE 0 END) as real_count, " +
                         "SUM(CASE WHEN source_type = 'SIMULATED' THEN 1 ELSE 0 END) as simulated_count " +
-                        "FROM Invoices WHERE 1=1 ");
+                        "FROM invoices WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
 
@@ -322,14 +322,14 @@ public class InvoiceDAO {
 
         String sql = "SELECT i.invoice_id, i.SALE_DATE, i.branch_id, i.pharmacist_id, i.customer_id, " +
                 "i.total_amount, i.source_type, " +
-                "b.branch_name, p.full_name as pharmacist_name, c.CUSTOMER_ID as customer_name " +
-                "FROM Invoices i " +
-                "LEFT JOIN Branches b ON i.branch_id = b.branch_id " +
-                "LEFT JOIN Pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
-                "LEFT JOIN Customers c ON i.customer_id = c.customer_id " +
+                "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+                "FROM invoices i " +
+                "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
+                "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
+                "LEFT JOIN customers c ON i.customer_id = c.customer_id " +
                 "WHERE CAST(i.invoice_id AS VARCHAR) LIKE ? " +
                 "OR p.full_name LIKE ? " +
-                "OR c.CUSTOMER_ID LIKE ? " +
+                "OR c.customer_name LIKE ? " +
                 "ORDER BY i.SALE_DATE DESC";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {

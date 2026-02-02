@@ -22,10 +22,10 @@ public class InventoryDAO {
         String sql = "SELECT i.*, m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
                 "m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, " +
                 "m.category_id, c.category_name, m.medicine_id, m.brand " +
-                "FROM Inventory i " +
-                "JOIN Batches b ON i.batch_id = b.batch_id " +
-                "JOIN Medicines m ON b.medicine_id = m.medicine_id " +
-                "JOIN Categories c ON m.category_id = c.category_id " +
+                "FROM inventory i " +
+                "JOIN batches b ON i.batch_id = b.batch_id " +
+                "JOIN medicines m ON b.medicine_id = m.medicine_id " +
+                "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE i.branch_id = ?";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -64,7 +64,7 @@ public class InventoryDAO {
     public void importBatch(int branchId, int medicineId, String batchNumber, Date expiry, int quantity,
             double importPrice) throws SQLException {
         // 1. Create Batch
-        String batchSql = "INSERT INTO Batches (medicine_id, batch_number, expiry_date, import_price_package) VALUES (?, ?, ?, ?)";
+        String batchSql = "INSERT INTO batches (medicine_id, batch_number, expiry_date, import_price_package) VALUES (?, ?, ?, ?)";
         try (PreparedStatement ps = connection.prepareStatement(batchSql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, medicineId);
             ps.setString(2, batchNumber);
@@ -77,7 +77,7 @@ public class InventoryDAO {
                 int batchId = rs.getInt(1);
 
                 // 2. Add to Inventory
-                String invSql = "INSERT INTO Inventory (branch_id, batch_id, quantity_std) VALUES (?, ?, ?)";
+                String invSql = "INSERT INTO inventory (branch_id, batch_id, quantity_std) VALUES (?, ?, ?)";
                 try (PreparedStatement psInv = connection.prepareStatement(invSql)) {
                     psInv.setInt(1, branchId);
                     psInv.setInt(2, batchId);
