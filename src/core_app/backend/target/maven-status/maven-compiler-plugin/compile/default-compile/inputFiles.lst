@@ -1,7 +1,13 @@
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\BatchApiServlet.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\BranchApiServlet.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\CategoryApiServlet.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\CustomerApiServlet.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\DashboardServlet.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\InventoryServlet.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\InvoiceDetailApiServlet.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\InvoiceServlet.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\MedicineServlet.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\controller\PharmacistApiServlet.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\dao\BatchDAO.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\dao\BranchDAO.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\dao\CategoryDAO.java
@@ -22,4 +28,8 @@ D:\GitHub\Group_5\src\core_app\backend\src\main\java\model\Invoice.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\model\InvoiceDetail.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\model\Medicine.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\model\Pharmacist.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\service\AuthService.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\service\CustomerService.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\service\PharmacyService.java
+D:\GitHub\Group_5\src\core_app\backend\src\main\java\service\SaleService.java
 D:\GitHub\Group_5\src\core_app\backend\src\main\java\utils\DBContext.java

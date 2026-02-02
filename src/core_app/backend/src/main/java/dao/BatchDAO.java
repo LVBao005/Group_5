@@ -45,6 +45,33 @@ public class BatchDAO {
         return null;
     }
 
+    public List<Batch> getBatchesByBranch(int branchId) throws SQLException {
+        List<Batch> batches = new ArrayList<>();
+        String sql = "SELECT b.*, m.name as medicine_name, m.base_unit, m.sub_unit, m.conversion_rate, i.quantity_std "
+                +
+                "FROM batches b " +
+                "JOIN medicines m ON b.medicine_id = m.medicine_id " +
+                "JOIN inventory i ON b.batch_id = i.batch_id " +
+                "WHERE i.branch_id = ? AND i.quantity_std > 0 " +
+                "ORDER BY b.expiry_date ASC";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, branchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Batch b = extractBatch(rs);
+                    // Set joined fields (Model needs these fields)
+                    b.setMedicineName(rs.getString("medicine_name"));
+                    b.setBaseUnit(rs.getString("base_unit"));
+                    b.setSubUnit(rs.getString("sub_unit"));
+                    b.setConversionRate(rs.getInt("conversion_rate"));
+                    b.setQuantityStd(rs.getInt("quantity_std"));
+                    batches.add(b);
+                }
+            }
+        }
+        return batches;
+    }
+
     private Batch extractBatch(ResultSet rs) throws SQLException {
         Batch b = new Batch();
         b.setBatchId(rs.getInt("batch_id"));

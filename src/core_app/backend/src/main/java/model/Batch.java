@@ -11,6 +11,16 @@ public class Batch {
     private Date expiryDate;
     private double importPricePackage;
 
+    // Joined fields
+    private String medicineName;
+    private String baseUnit;
+    private String subUnit;
+    private int conversionRate;
+    private int quantityStd;
+    private int currentBoxes;
+    private int currentUnits;
+    private String expiryStatus; // e.g., "NORMAL", "RED", "EXPIRED"
+
     public Batch() {
     }
 
@@ -70,6 +80,80 @@ public class Batch {
 
     public void setImportPricePackage(double importPricePackage) {
         this.importPricePackage = importPricePackage;
+    }
+
+    public String getMedicineName() {
+        return medicineName;
+    }
+
+    public void setMedicineName(String medicineName) {
+        this.medicineName = medicineName;
+    }
+
+    public String getBaseUnit() {
+        return baseUnit;
+    }
+
+    public void setBaseUnit(String baseUnit) {
+        this.baseUnit = baseUnit;
+    }
+
+    public String getSubUnit() {
+        return subUnit;
+    }
+
+    public void setSubUnit(String subUnit) {
+        this.subUnit = subUnit;
+    }
+
+    public int getConversionRate() {
+        return conversionRate;
+    }
+
+    public void setConversionRate(int conversionRate) {
+        this.conversionRate = conversionRate;
+    }
+
+    public int getQuantityStd() {
+        return quantityStd;
+    }
+
+    public void setQuantityStd(int quantityStd) {
+        this.quantityStd = quantityStd;
+    }
+
+    public String getExpiryStatus() {
+        return expiryStatus;
+    }
+
+    public void setExpiryStatus(String expiryStatus) {
+        this.expiryStatus = expiryStatus;
+    }
+
+    public int getCurrentBoxes() {
+        return currentBoxes;
+    }
+
+    public void setCurrentBoxes(int currentBoxes) {
+        this.currentBoxes = currentBoxes;
+    }
+
+    public int getCurrentUnits() {
+        return currentUnits;
+    }
+
+    public void setCurrentUnits(int currentUnits) {
+        this.currentUnits = currentUnits;
+    }
+
+    public void processUnits() {
+        if (conversionRate > 0) {
+            this.currentBoxes = quantityStd / conversionRate;
+            this.currentUnits = quantityStd % conversionRate;
+        } else {
+            this.currentBoxes = 0;
+            this.currentUnits = quantityStd;
+        }
     }
 
     // Helper to check expiry

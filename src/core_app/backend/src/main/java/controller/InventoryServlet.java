@@ -43,7 +43,15 @@ public class InventoryServlet extends HttpServlet {
                 branchId = Integer.parseInt(branchIdStr);
             }
 
-            List<Inventory> inventory = inventoryDAO.getInventoryByBranch(branchId);
+            String query = request.getParameter("q");
+            List<Inventory> inventory;
+
+            if (query != null && !query.trim().isEmpty()) {
+                inventory = inventoryDAO.searchInventoryForPOS(branchId, query);
+            } else {
+                inventory = inventoryDAO.getInventoryByBranch(branchId);
+            }
+
             out.print(gson.toJson(inventory));
 
         } catch (Exception e) {

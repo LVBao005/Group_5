@@ -49,4 +49,30 @@ public class BranchDAO {
         }
         return null;
     }
+
+    public int getPharmacistCount(int branchId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM pharmacists WHERE branch_id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, branchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        return 0;
+    }
+
+    public int getInvoiceCount(int branchId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM invoices WHERE branch_id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, branchId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        }
+        return 0;
+    }
 }

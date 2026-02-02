@@ -18,10 +18,14 @@ public class Inventory {
     private String subUnit;
     private int conversionRate;
     private double baseSellPrice;
+    private double subSellPrice;
     private int categoryId;
     private String categoryName;
     private int medicineId;
     private String brand;
+    private int baseQuantity; // Calculated
+    private int subQuantity; // Calculated
+    private String displayStock; // Calculated
 
     public Inventory() {
     }
@@ -139,6 +143,14 @@ public class Inventory {
         this.baseSellPrice = baseSellPrice;
     }
 
+    public double getSubSellPrice() {
+        return subSellPrice;
+    }
+
+    public void setSubSellPrice(double subSellPrice) {
+        this.subSellPrice = subSellPrice;
+    }
+
     public int getCategoryId() {
         return categoryId;
     }
@@ -169,5 +181,54 @@ public class Inventory {
 
     public void setBrand(String brand) {
         this.brand = brand;
+    }
+
+    public int getBaseQuantity() {
+        return baseQuantity;
+    }
+
+    public void setBaseQuantity(int baseQuantity) {
+        this.baseQuantity = baseQuantity;
+    }
+
+    public int getSubQuantity() {
+        return subQuantity;
+    }
+
+    public void setSubQuantity(int subQuantity) {
+        this.subQuantity = subQuantity;
+    }
+
+    public String getDisplayStock() {
+        return displayStock;
+    }
+
+    public void setDisplayStock(String displayStock) {
+        this.displayStock = displayStock;
+    }
+
+    // Calculation helper
+    public void calculateUnits() {
+        if (conversionRate <= 0) {
+            this.baseQuantity = 0;
+            this.subQuantity = quantityStd;
+        } else {
+            this.baseQuantity = quantityStd / conversionRate;
+            this.subQuantity = quantityStd % conversionRate;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (baseQuantity > 0) {
+            sb.append(baseQuantity).append(" ").append(baseUnit != null ? baseUnit : "hộp");
+        }
+        if (subQuantity > 0) {
+            if (sb.length() > 0)
+                sb.append(" và ");
+            sb.append(subQuantity).append(" ").append(subUnit != null ? subUnit : "viên");
+        }
+        if (sb.length() == 0) {
+            sb.append("Hết hàng");
+        }
+        this.displayStock = sb.toString();
     }
 }
