@@ -1,7 +1,7 @@
 import axios from '../api/axios';
 
 // Mock Data Generator cho demo
-const USE_MOCK_DATA = true; // Set false khi backend sẵn sàng
+const USE_MOCK_DATA = false; // Set false khi backend sẵn sàng
 
 /**
  * Generate mock data for dashboard demo
@@ -178,7 +178,7 @@ const dashboardService = {
             await new Promise(resolve => setTimeout(resolve, 300));
             return mockDataGenerator.getStats();
         }
-        
+
         try {
             const response = await axios.get('/api/dashboard/stats');
             return response.data;
@@ -198,7 +198,7 @@ const dashboardService = {
             await new Promise(resolve => setTimeout(resolve, 300));
             return mockDataGenerator.getRevenueTimeline(period);
         }
-        
+
         try {
             const response = await axios.get(`/api/dashboard/revenue-timeline?period=${period}`);
             return response.data;
@@ -216,7 +216,7 @@ const dashboardService = {
             await new Promise(resolve => setTimeout(resolve, 300));
             return mockDataGenerator.getRevenueByCategory();
         }
-        
+
         try {
             const response = await axios.get('/api/dashboard/revenue-by-category');
             return response.data;
@@ -234,7 +234,7 @@ const dashboardService = {
             await new Promise(resolve => setTimeout(resolve, 300));
             return mockDataGenerator.getAlerts();
         }
-        
+
         try {
             const response = await axios.get('/api/dashboard/alerts');
             return response.data;
@@ -252,7 +252,7 @@ const dashboardService = {
             await new Promise(resolve => setTimeout(resolve, 100));
             return mockDataGenerator.getRealtimeData();
         }
-        
+
         try {
             const response = await axios.get('/api/dashboard/realtime');
             return response.data;

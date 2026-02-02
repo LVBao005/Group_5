@@ -14,22 +14,80 @@ import {
     User
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-import { MOCK_MEDICINES, MOCK_CATEGORIES } from '../mockData';
+import { MOCK_BRANCHES } from '../mockData'; // Still need branches
 import { cn } from '../lib/utils';
+import { inventoryService } from '../services/inventoryService';
 
 const Inventory = () => {
-    const [activeCategory, setActiveCategory] = useState(0);
+    const [medicines, setMedicines] = useState([]); // This will hold flattened inventory items
+    const [activeCategory, setActiveCategory] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    // Flatten medicines into batches for inventory view
-    const inventoryItems = MOCK_MEDICINES.flatMap(medicine =>
-        medicine.batches.map(batch => ({
-            ...medicine,
-            ...batch,
-            // Calculate display stock: stock_std / conversion_rate
-            boxQty: Math.floor(batch.stock_std / medicine.conversion_rate),
-            subQty: batch.stock_std % medicine.conversion_rate
-        }))
-    ).filter(item => activeCategory === 0 || item.category_id === activeCategory);
+    // Get user branch
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const branchId = user?.branch_id || 1;
+
+    // Load Data
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const data = await inventoryService.getInventoryByBranch(branchId);
+            setMedicines(data);
+        } catch (error) {
+            console.error("Failed to load inventory", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
+    }, [branchId]);
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            setLoading(true);
+            await inventoryService.importCSV(file, branchId);
+            alert("Import thành công!");
+            loadData(); // Refresh data
+        } catch (error) {
+            alert("Lỗi khi import file!");
+        } finally {
+            setLoading(false);
+            e.target.value = null; // Reset input
+        }
+    };
+
+    // Filter logic
+    const filteredMedicines = medicines.filter(item => {
+        const matchesSearch = item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.batchNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = activeCategory === 'all' || item.categoryName === activeCategory;
+        return matchesSearch && matchesCategory;
+    });
+
+    // Extract unique categories from real data
+    const categories = ['all', ...new Set(medicines.map(m => m.categoryName).filter(Boolean))];
+
+    // Map filtered data to UI structure
+    const inventoryItems = filteredMedicines.map(item => ({
+        ...item,
+        name: item.medicineName,
+        batch_number: item.batchNumber,
+        expiry_date: item.expiryDate,
+        import_price_package: item.importPrice || 0, // Fallback if missing
+        base_unit: item.baseUnit,
+        sub_unit: item.subUnit,
+        brand: item.brand || 'Generic',
+        // Calculate display stock
+        boxQty: Math.floor(item.quantityStd / (item.conversionRate || 1)),
+        subQty: item.quantityStd % (item.conversionRate || 1)
+    }));
 
     return (
         <div className="flex h-screen bg-[#0d0f0e] text-slate-200 overflow-hidden font-sans">
@@ -69,7 +127,7 @@ const Inventory = () => {
                     {/* Summary Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
                         {[
-                            { label: 'Tổng mặt hàng', value: MOCK_MEDICINES.length, icon: Package, color: 'text-white' },
+                            { label: 'Tổng mặt hàng', value: medicines.length, icon: Package, color: 'text-white' },
                             { label: 'Sắp hết hạn', value: '12', icon: AlertTriangle, color: 'text-amber-500' },
                             { label: 'Dưới định mức', value: '05', icon: ArrowDownRight, color: 'text-rose-500' },
                             { label: 'Giá trị tồn kho', value: '1.2B', icon: TrendingUp, color: 'text-[#00ff80]' }
@@ -87,28 +145,28 @@ const Inventory = () => {
                     </div>
 
                     {/* Filters & Table */}
-                    <div className="bg-[#161a19] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
+                    < div className="bg-[#161a19] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col" >
                         <div className="p-8 border-b border-white/5 flex items-center justify-between">
                             <div className="flex gap-2 overflow-auto scrollbar-hide pb-1">
                                 <button
-                                    onClick={() => setActiveCategory(0)}
+                                    onClick={() => setActiveCategory('all')}
                                     className={cn(
                                         "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border",
-                                        activeCategory === 0 ? "bg-[#00ff80] border-[#00ff80] text-[#04110b]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                                        activeCategory === 'all' ? "bg-[#00ff80] border-[#00ff80] text-[#04110b]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
                                     )}
                                 >
                                     Tất cả
                                 </button>
-                                {MOCK_CATEGORIES.map(cat => (
+                                {categories.filter(c => c !== 'all').map(cat => (
                                     <button
-                                        key={cat.category_id}
-                                        onClick={() => setActiveCategory(cat.category_id)}
+                                        key={cat}
+                                        onClick={() => setActiveCategory(cat)}
                                         className={cn(
                                             "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border shrink-0",
-                                            activeCategory === cat.category_id ? "bg-[#00ff80] border-[#00ff80] text-[#04110b]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
+                                            activeCategory === cat ? "bg-[#00ff80] border-[#00ff80] text-[#04110b]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
                                         )}
                                     >
-                                        {cat.category_name}
+                                        {cat}
                                     </button>
                                 ))}
                             </div>
@@ -186,10 +244,10 @@ const Inventory = () => {
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+                    </div >
+                </div >
+            </main >
+        </div >
     );
 };
 

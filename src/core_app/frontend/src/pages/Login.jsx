@@ -3,7 +3,6 @@ import { User, Eye, EyeOff, LogIn, Pill, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import { MOCK_USERS } from '../mockData';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -23,15 +22,20 @@ const Login = () => {
 
         // Giả lập độ trễ network
         setTimeout(() => {
-            const user = MOCK_USERS.find(
-                (u) => u.username === formData.username && u.password === formData.password
-            );
-
-            if (user) {
-                localStorage.setItem('user', JSON.stringify(user));
+            // LOGIN GIẢ LẬP (MOCK)
+            if (formData.username === 'admin' && formData.password === '123') {
+                const mockUser = {
+                    id: 1,
+                    username: 'admin',
+                    fullName: 'Administrator',
+                    role: 'Pharmacist',
+                    branch_id: 1,
+                    pharmacist_id: 1
+                };
+                localStorage.setItem('user', JSON.stringify(mockUser));
                 navigate('/pos');
             } else {
-                setError('Tài khoản hoặc mật khẩu không chính xác!');
+                setError('Tài khoản hoặc mật khẩu không chính xác! (Thử: admin / 123)');
             }
             setLoading(false);
         }, 1000);

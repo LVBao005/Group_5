@@ -57,7 +57,7 @@ const Dashboard = () => {
     const loadDashboardData = async () => {
         try {
             setIsRefreshing(true);
-            
+
             // Load stats
             const statsRes = await dashboardService.getStats();
             if (statsRes.success) {
@@ -149,14 +149,14 @@ const Dashboard = () => {
                             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
                             <span className="hidden lg:inline">Làm mới</span>
                         </button>
-                        
+
                         <div className="text-right">
                             <p className="text-sm font-black text-white leading-none">{time}</p>
                             <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">
                                 {day}, {date}
                             </p>
                         </div>
-                        
+
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />
                         </div>
@@ -210,11 +210,10 @@ const Dashboard = () => {
                                     <button
                                         key={p.value}
                                         onClick={() => setPeriod(p.value)}
-                                        className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all ${
-                                            period === p.value
+                                        className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all ${period === p.value
                                                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                                 : 'bg-[#1a1d1c] text-white/60 border border-white/5 hover:border-white/20'
-                                        }`}
+                                            }`}
                                     >
                                         {p.label}
                                     </button>

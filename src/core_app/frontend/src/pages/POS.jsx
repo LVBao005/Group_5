@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Search,
     ShoppingCart,
@@ -14,20 +14,26 @@ import {
     X,
     Trash2,
     Printer,
+    ChevronLeft,
     ChevronRight,
     ShieldCheck,
     Banknote,
     Users
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-import { MOCK_MEDICINES, MOCK_CATEGORIES, MOCK_BRANCHES } from '../mockData';
 import { cn } from '../lib/utils';
 import { invoiceService } from '../services/invoiceService';
+import { inventoryService } from '../services/inventoryService';
 
 const POS = () => {
+    const [medicines, setMedicines] = useState([]);
     const [activeCategory, setActiveCategory] = useState(0); // 0 = Tất cả
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    const [categories, setCategories] = useState([]);
     const [cart, setCart] = useState([]);
     const [quantities, setQuantities] = useState({}); // Local state for cards quantity inputs
+    const [selectedUnits, setSelectedUnits] = useState({}); // { [medicineId]: 'base' | 'sub' }
     const [showInvoice, setShowInvoice] = useState(false);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -36,11 +42,85 @@ const POS = () => {
     // Get current user and branch for the invoice
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
-    const branch = MOCK_BRANCHES.find(b => b.branch_id === user?.branch_id);
 
+    // Placeholder for branch info until we have a real service
+    const branch = { branch_name: "Chi nhánh chính", address: "Hệ thống trung tâm" };
+
+    // Load Data
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch inventory for current branch (default 1)
+                const inventoryData = await inventoryService.getInventoryByBranch(user?.branch_id || 1);
+
+                // Process inventory into Medicines with Batches
+                const grouped = {};
+                const cats = new Set();
+
+                inventoryData.forEach(item => {
+                    // Collect categories
+                    if (item.categoryId && item.categoryName) {
+                        cats.add(JSON.stringify({ category_id: item.categoryId, category_name: item.categoryName }));
+                    }
+
+                    if (!grouped[item.medicineId]) {
+                        grouped[item.medicineId] = {
+                            medicine_id: item.medicineId,
+                            name: item.medicineName,
+                            base_unit: item.baseUnit,
+                            sub_unit: item.subUnit, // Add sub_unit
+                            base_sell_price: item.baseSellPrice || 0,
+                            sub_sell_price: item.subSellPrice || 0, // Add sub_sell_price
+                            conversion_rate: item.conversionRate || 1, // Add conversion_rate
+                            category_id: item.categoryId,
+                            batches: [],
+                            // Add image placeholder if needed, or mapping logic
+                            image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
+                        };
+                    }
+                    grouped[item.medicineId].batches.push({
+                        batch_id: item.batchId,
+                        quantity_std: item.quantityStd,
+                        expiry_date: item.expiryDate,
+                        batch_number: item.batchNumber
+                    });
+                });
+
+                // Finalize medicines list
+                const medicinesList = Object.values(grouped).map(m => {
+                    // Calculate total stock
+                    m.total_stock = m.batches.reduce((sum, b) => sum + b.quantity_std, 0);
+                    // Sort batches by expiry (FIFO)
+                    m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+                    return m;
+                });
+
+                setMedicines(medicinesList);
+                setCategories(Array.from(cats).map(c => JSON.parse(c)));
+
+            } catch (error) {
+                console.error("Failed to load POS data", error);
+            }
+        };
+        fetchData();
+    }, []);
+
+    // Filter logic
     const filteredMedicines = activeCategory === 0
-        ? MOCK_MEDICINES
-        : MOCK_MEDICINES.filter(m => m.category_id === activeCategory);
+        ? medicines
+        : medicines.filter(m => m.category_id === activeCategory);
+
+    // Pagination Logic (Only for "All" category)
+    const displayMedicines = activeCategory === 0
+        ? filteredMedicines.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+        : filteredMedicines;
+
+    const totalPages = Math.ceil(filteredMedicines.length / ITEMS_PER_PAGE);
+
+    const handleCategoryChange = (catId) => {
+        setActiveCategory(catId);
+        setCurrentPage(1); // Reset to page 1 when category changes
+    };
 
     const getIcon = (type) => {
         switch (type) {
@@ -52,6 +132,10 @@ const POS = () => {
         }
     };
 
+    const formatPrice = (price) => {
+        return (price || 0).toLocaleString('vi-VN');
+    };
+
     const handleUpdateLocalQty = (id, delta) => {
         setQuantities(prev => ({
             ...prev,
@@ -59,24 +143,64 @@ const POS = () => {
         }));
     };
 
+    const handleUnitChange = (medicineId, unit) => {
+        setSelectedUnits(prev => ({
+            ...prev,
+            [medicineId]: unit
+        }));
+    };
+
     const addToCart = (medicine) => {
         const qty = quantities[medicine.medicine_id] || 1;
-        const existing = cart.find(item => item.medicine_id === medicine.medicine_id);
+        const unitType = selectedUnits[medicine.medicine_id] || 'base';
+        const isSub = unitType === 'sub';
 
-        if (existing) {
-            setCart(cart.map(item =>
-                item.medicine_id === medicine.medicine_id
-                    ? { ...item, quantity: item.quantity + qty }
-                    : item
-            ));
+        const unitName = isSub ? medicine.sub_unit : medicine.base_unit;
+        const price = isSub ? medicine.sub_sell_price : medicine.base_sell_price;
+        const conversion = medicine.conversion_rate || 1;
+
+        // Calculate requested quantity in BASE units for stock check
+        const requestedQuota = isSub ? Math.ceil(qty / conversion) : qty;
+
+        // Check existing cart items for total stock usage
+        const existingItems = cart.filter(item => item.medicine_id === medicine.medicine_id);
+        let currentStockUsed = 0;
+
+        existingItems.forEach(item => {
+            const itemIsSub = item.unit === medicine.sub_unit;
+            const itemQuota = itemIsSub ? Math.ceil(item.quantity / conversion) : item.quantity;
+            currentStockUsed += itemQuota;
+        });
+
+        // Simple check: This "quota" logic cleans up stock checking but is approximate for sub-units
+        // A better check is: (current_stock_used_in_base * conversion) + (current_sub_units) <= total_stock * conversion
+        // But for now, we'll stick to a simpler safe check:
+        // Total Base Units needed <= Total Stock
+
+        if (currentStockUsed + requestedQuota > medicine.total_stock) {
+            alert(`Không đủ tồn kho! Chỉ còn ${medicine.total_stock} ${medicine.base_unit}`);
+            return;
+        }
+
+        const existingItemIndex = cart.findIndex(item =>
+            item.medicine_id === medicine.medicine_id && item.unit === unitName
+        );
+
+        if (existingItemIndex > -1) {
+            const newCart = [...cart];
+            newCart[existingItemIndex].quantity += qty;
+            setCart(newCart);
         } else {
             setCart([...cart, {
                 ...medicine,
                 quantity: qty,
-                price: medicine.base_sell_price // Default to base unit in this view
+                price: price,
+                unit: unitName,
+                is_sub: isSub
             }]);
         }
-        // Reset quantity input on card
+
+        // Reset quantity
         setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 1 }));
     };
 
@@ -91,6 +215,41 @@ const POS = () => {
     const confirmPayment = async () => {
         setLoading(true);
 
+        // Process cart allocations (FIFO)
+        const detailsPayload = [];
+
+        for (const item of cart) {
+            const medicine = medicines.find(m => m.medicine_id === item.medicine_id);
+            if (!medicine) continue;
+
+            let remainingQty = item.quantity;
+            let allocated = 0;
+
+            // Batches are already sorted by expiry in 'medicines' state
+            for (const batch of medicine.batches) {
+                if (remainingQty <= 0) break;
+
+                const take = Math.min(remainingQty, batch.quantity_std);
+                if (take > 0) {
+                    detailsPayload.push({
+                        batch_id: batch.batch_id,
+                        unit_sold: item.base_unit,
+                        quantity_sold: take,
+                        unit_price: item.price,
+                        total_std_quantity: take * (item.conversion_rate || 1) // Assuming selling base unit
+                    });
+                    remainingQty -= take;
+                    allocated += take;
+                }
+            }
+
+            if (remainingQty > 0) {
+                alert(`Lỗi: Thuốc ${item.name} không đủ tồn kho để thực hiện giao dịch này! (Thiếu ${remainingQty})`);
+                setLoading(false);
+                return;
+            }
+        }
+
         // Construct SQL-aligned payload
         const payload = {
             branch_id: user?.branch_id || 1,
@@ -98,13 +257,7 @@ const POS = () => {
             customer_id: null, // Backend can resolve by phone if provided
             total_amount: totalAmount,
             sale_date: new Date().toISOString(),
-            details: cart.map(item => ({
-                batch_id: item.batches[0]?.batch_id,
-                unit_sold: item.base_unit,
-                quantity_sold: item.quantity,
-                unit_price: item.price,
-                total_std_quantity: item.quantity * item.conversion_rate
-            }))
+            details: detailsPayload
         };
 
         try {
@@ -159,7 +312,7 @@ const POS = () => {
                 {/* Categories Bar */}
                 <div className="px-10 py-4 flex gap-3 overflow-auto scrollbar-hide shrink-0">
                     <button
-                        onClick={() => setActiveCategory(0)}
+                        onClick={() => handleCategoryChange(0)}
                         className={cn(
                             "px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all border",
                             activeCategory === 0 ? "bg-[#00ff80] border-[#00ff80] text-[#04110b] shadow-[0_0_20px_rgba(0,255,128,0.2)]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
@@ -167,10 +320,10 @@ const POS = () => {
                     >
                         Tất cả
                     </button>
-                    {MOCK_CATEGORIES.map(cat => (
+                    {categories.map(cat => (
                         <button
                             key={cat.category_id}
-                            onClick={() => setActiveCategory(cat.category_id)}
+                            onClick={() => handleCategoryChange(cat.category_id)}
                             className={cn(
                                 "px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all border",
                                 activeCategory === cat.category_id ? "bg-[#00ff80] border-[#00ff80] text-[#04110b]" : "bg-white/5 border-white/5 text-white/40 hover:text-white"
@@ -182,55 +335,126 @@ const POS = () => {
                 </div>
 
                 {/* Product Grid */}
-                <div className="flex-1 overflow-auto p-10 pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start">
-                    {filteredMedicines.map(medicine => {
-                        const Icon = getIcon(medicine.icon);
-                        const localQty = quantities[medicine.medicine_id] || 1;
-                        return (
-                            <div key={medicine.medicine_id} className="bg-[#161a19] border border-white/5 rounded-3xl p-6 flex flex-col hover:border-[#00ff80]/30 transition-all group overflow-hidden relative">
-                                {/* Category Tag */}
-                                <div className="absolute top-4 right-4 bg-white/5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded text-white/30 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] transition-all">
-                                    {medicine.category_name}
-                                </div>
+                <div className="flex-1 overflow-auto p-10 pt-4 flex flex-col">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start mb-auto">
+                        {displayMedicines.map(medicine => {
+                            if (!medicine) return null; // Defensive check
+                            const localQty = quantities[medicine.medicine_id] || 1;
+                            const selectedUnit = selectedUnits[medicine.medicine_id] || 'base';
+                            const displayPrice = selectedUnit === 'sub' ? medicine.sub_sell_price : medicine.base_sell_price;
+                            const displayUnit = selectedUnit === 'sub' ? medicine.sub_unit : medicine.base_unit;
 
-                                {/* Top Icon */}
-                                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 mb-6 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] group-hover:scale-110 transition-all duration-500">
-                                    <Icon size={24} />
-                                </div>
+                            return (
+                                <div key={medicine.medicine_id} className="bg-[#161a19] border border-white/5 rounded-3xl p-6 flex flex-col hover:border-[#00ff80]/30 transition-all group overflow-hidden relative">
+                                    {/* Category Tag */}
+                                    <div className="absolute top-4 right-4 bg-white/5 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded text-white/30 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] transition-all">
+                                        {medicine.category_name}
+                                    </div>
 
-                                <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>
-                                <div className="flex items-baseline gap-1 mb-8">
-                                    <span className="text-xl font-black text-[#00ff80] tracking-tighter">{medicine.base_sell_price.toLocaleString()}</span>
-                                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">VNĐ / {medicine.base_unit}</span>
-                                </div>
+                                    <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>
+                                    <div className="flex items-baseline gap-1 mb-6">
+                                        <span className="text-xl font-black text-[#00ff80] tracking-tighter">{formatPrice(displayPrice)}</span>
+                                        <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">VNĐ / {displayUnit}</span>
+                                    </div>
 
-                                {/* Qty Selector */}
-                                <div className="mt-auto grid grid-cols-1 gap-3">
-                                    <div className="flex items-center justify-between bg-[#0d0f0e] border border-white/5 rounded-2xl p-1.5 px-3">
+                                    {/* Unit Selector - Only if sub_unit exists */}
+                                    {medicine.sub_unit && (
+                                        <div className="mb-4">
+                                            <select
+                                                value={selectedUnit}
+                                                onChange={(e) => handleUnitChange(medicine.medicine_id, e.target.value)}
+                                                className="w-full bg-[#0d0f0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#00ff80]/50 cursor-pointer appearance-none"
+                                            >
+                                                <option value="base">{medicine.base_unit} (Quy chuẩn)</option>
+                                                <option value="sub">{medicine.sub_unit} (Bán lẻ)</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Qty Selector */}
+                                    <div className="mt-auto grid grid-cols-1 gap-3">
+                                        <div className="flex items-center justify-between bg-[#0d0f0e] border border-white/5 rounded-2xl p-1.5 px-3">
+                                            <button
+                                                onClick={() => handleUpdateLocalQty(medicine.medicine_id, -1)}
+                                                className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-[#00ff80] hover:bg-white/10 transition-all font-bold"
+                                            >
+                                                <Minus size={14} />
+                                            </button>
+                                            <span className="font-black text-white tabular-nums">{localQty}</span>
+                                            <button
+                                                onClick={() => handleUpdateLocalQty(medicine.medicine_id, 1)}
+                                                className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-[#00ff80] hover:bg-white/10 transition-all font-bold"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                        </div>
                                         <button
-                                            onClick={() => handleUpdateLocalQty(medicine.medicine_id, -1)}
-                                            className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-[#00ff80] hover:bg-white/10 transition-all font-bold"
+                                            onClick={() => addToCart(medicine)}
+                                            className="w-full bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[11px] py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
                                         >
-                                            <Minus size={14} />
-                                        </button>
-                                        <span className="font-black text-white tabular-nums">{localQty}</span>
-                                        <button
-                                            onClick={() => handleUpdateLocalQty(medicine.medicine_id, 1)}
-                                            className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-[#00ff80] hover:bg-white/10 transition-all font-bold"
-                                        >
-                                            <Plus size={14} />
+                                            <ShoppingCart size={16} strokeWidth={3} /> Thêm vào giỏ
                                         </button>
                                     </div>
-                                    <button
-                                        onClick={() => addToCart(medicine)}
-                                        className="w-full bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[11px] py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
-                                    >
-                                        <ShoppingCart size={16} strokeWidth={3} /> Thêm vào giỏ
-                                    </button>
                                 </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Pagination Controls - Only show if activeCategory is "All" and there are pages */}
+                    {activeCategory === 0 && totalPages > 1 && (
+                        <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-4">
+                            <div className="text-xs font-black text-white/30 uppercase tracking-widest">
+                                Món {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredMedicines.length)} trong {filteredMedicines.length}
                             </div>
-                        );
-                    })}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-2 rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(page => {
+                                            // Show first, last, current, and adjacent pages
+                                            return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                                        })
+                                        .map((page, index, array) => {
+                                            // Add ellipsis logic
+                                            const prevPage = array[index - 1];
+                                            const showEllipsis = prevPage && page - prevPage > 1;
+
+                                            return (
+                                                <React.Fragment key={page}>
+                                                    {showEllipsis && <span className="text-white/20 text-xs font-black px-2">...</span>}
+                                                    <button
+                                                        onClick={() => setCurrentPage(page)}
+                                                        className={cn(
+                                                            "w-8 h-8 rounded-lg text-xs font-black transition-all flex items-center justify-center",
+                                                            currentPage === page
+                                                                ? "bg-[#00ff80] text-[#04110b] shadow-[0_0_15px_rgba(0,255,128,0.25)] scale-110"
+                                                                : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                                                        )}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                </div>
+
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                    className="p-2 rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -271,10 +495,10 @@ const POS = () => {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-bold text-white text-sm truncate">{item.name}</p>
-                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} x {item.price.toLocaleString()}đ</p>
+                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} x {formatPrice(item.price)}đ</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-black text-white tabular-nums tracking-tighter">{(item.price * item.quantity).toLocaleString()}</p>
+                                            <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}</p>
                                         </div>
                                         <button
                                             onClick={() => setCart(cart.filter(i => i.medicine_id !== item.medicine_id))}
@@ -302,12 +526,12 @@ const POS = () => {
                             </div>
                             <div className="flex justify-between items-center px-2">
                                 <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Tạm tính</span>
-                                <span className="font-black text-white/40 tabular-nums">{totalAmount.toLocaleString()} đ</span>
+                                <span className="font-black text-white/40 tabular-nums">{formatPrice(totalAmount)} đ</span>
                             </div>
                             <div className="flex justify-between items-end px-2 pt-2">
                                 <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Tổng thanh toán</span>
                                 <span className="text-3xl font-black text-[#00ff80] tracking-tighter tabular-nums leading-none">
-                                    {totalAmount.toLocaleString()} <span className="text-xs ml-1 font-black">đ</span>
+                                    {formatPrice(totalAmount)} <span className="text-xs ml-1 font-black">đ</span>
                                 </span>
                             </div>
                         </div>
@@ -395,10 +619,10 @@ const POS = () => {
                                                 <span className="text-xs font-black text-white/20 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
                                                 <div>
                                                     <p className="text-sm font-bold text-white">{item.name}</p>
-                                                    <p className="text-[10px] text-white/20 font-bold uppercase">{item.quantity} x {item.price.toLocaleString()}đ</p>
+                                                    <p className="text-[10px] text-white/20 font-bold uppercase">{item.quantity} x {formatPrice(item.price)}đ</p>
                                                 </div>
                                             </div>
-                                            <p className="text-sm font-black text-white tabular-nums">{(item.price * item.quantity).toLocaleString()} <span className="text-[10px] text-white/30 ml-1">đ</span></p>
+                                            <p className="text-sm font-black text-white tabular-nums">{formatPrice(item.price * item.quantity)} <span className="text-[10px] text-white/30 ml-1">đ</span></p>
                                         </div>
                                     ))}
                                 </div>
@@ -411,7 +635,7 @@ const POS = () => {
                                 <div className="flex justify-between items-center px-2">
                                     <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Cần thanh toán</span>
                                     <span className="text-4xl font-black text-[#00ff80] tracking-tighter tabular-nums">
-                                        {totalAmount.toLocaleString()} <span className="text-xs ml-1">đ</span>
+                                        {formatPrice(totalAmount)} <span className="text-xs ml-1">đ</span>
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-4">

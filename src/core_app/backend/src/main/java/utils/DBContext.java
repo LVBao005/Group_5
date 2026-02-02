@@ -13,21 +13,22 @@ public class DBContext {
 
     /* ADAPT THESE TO YOUR LOCAL ENVIRONMENT OR PASS VIA ENV VARS */
     private final String serverName = "localhost";
-    private final String dbName = "pharmacy_db";
+    private final String dbName = "pmdb";
     private final String portNumber = "3306";
-    private final String instance = ""; // For SQL Server, leave empty for MySQL
+
     private final String userID = "root";
-    private final String password = "password";
+    private final String password = "123456";
 
     /**
      * Get connection to MySQL Database.
+     * 
      * @return Connection object
      * @throws ClassNotFoundException
      * @throws SQLException
      */
     public Connection getConnection() throws ClassNotFoundException, SQLException {
         // MySQL 8.0+ uses com.mysql.cj.jdbc.Driver
-        String url = "jdbc:mysql://" + serverName + ":" + portNumber + "/" + dbName 
+        String url = "jdbc:mysql://" + serverName + ":" + portNumber + "/" + dbName
                 + "?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true";
         Class.forName("com.mysql.cj.jdbc.Driver");
         return DriverManager.getConnection(url, userID, password);

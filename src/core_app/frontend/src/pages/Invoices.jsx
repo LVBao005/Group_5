@@ -25,7 +25,7 @@ const Invoices = () => {
     const [filteredInvoices, setFilteredInvoices] = useState([]);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [loading, setLoading] = useState(true);
-    
+
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFrom, setDateFrom] = useState('');
@@ -63,7 +63,7 @@ const Invoices = () => {
 
         // Search filter (invoice ID or pharmacist name)
         if (searchTerm) {
-            filtered = filtered.filter(inv => 
+            filtered = filtered.filter(inv =>
                 inv.invoice_id.toString().includes(searchTerm) ||
                 inv.pharmacist_name?.toLowerCase().includes(searchTerm.toLowerCase())
             );
@@ -79,14 +79,14 @@ const Invoices = () => {
 
         // Pharmacist filter
         if (pharmacistFilter) {
-            filtered = filtered.filter(inv => 
+            filtered = filtered.filter(inv =>
                 inv.pharmacist_name?.toLowerCase().includes(pharmacistFilter.toLowerCase())
             );
         }
 
         // Status filter
         if (statusFilter !== 'all') {
-            filtered = filtered.filter(inv => 
+            filtered = filtered.filter(inv =>
                 statusFilter === 'simulated' ? inv.is_simulated : !inv.is_simulated
             );
         }
@@ -270,9 +270,8 @@ const Invoices = () => {
                                             {filteredInvoices.map((invoice, index) => (
                                                 <tr
                                                     key={invoice.invoice_id}
-                                                    className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
-                                                        index % 2 === 0 ? 'bg-[#0d0f0e]/50' : ''
-                                                    }`}
+                                                    className={`border-b border-white/5 hover:bg-white/5 transition-colors ${index % 2 === 0 ? 'bg-[#0d0f0e]/50' : ''
+                                                        }`}
                                                 >
                                                     <td className="px-6 py-4 text-sm font-bold text-[#00ff80]">#{invoice.invoice_id}</td>
                                                     <td className="px-6 py-4 text-sm text-white/60">
@@ -377,9 +376,9 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                         <InfoItem label="Nhân viên" value={invoice.pharmacist_name || 'N/A'} icon={User} />
                         <InfoItem label="Khách hàng" value={invoice.customer_name || 'N/A'} icon={UserCircle} />
                         <InfoItem label="Chi nhánh" value={invoice.branch_name || 'N/A'} icon={Package} />
-                        <InfoItem 
-                            label="Trạng thái" 
-                            value={invoice.is_simulated ? 'Simulated' : 'Real'} 
+                        <InfoItem
+                            label="Trạng thái"
+                            value={invoice.is_simulated ? 'Simulated' : 'Real'}
                             icon={invoice.is_simulated ? Bot : UserCircle}
                             className={invoice.is_simulated ? 'text-orange-400' : 'text-purple-400'}
                         />
@@ -513,30 +512,5 @@ const getMockInvoices = () => [
         ]
     }
 ];
-
-export default Invoices;
-                                            <h4 className="text-xl font-black text-white mb-2">{customer?.name}</h4>
-                                            <span className="text-[10px] text-white/20 font-bold tracking-widest uppercase">{new Date(invoice.sale_date).toLocaleString('vi-VN')}</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-3xl font-black text-[#00ff80] tracking-tighter tabular-nums">{invoice.total_amount.toLocaleString()} <span className="text-xs">đ</span></p>
-                                            <p className="text-[10px] text-white/20 font-black uppercase tracking-widest mt-1">Thanh toán tiền mặt</p>
-                                        </div>
-                                        <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-[#00ff80] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </main>
-        </div>
-    );
-};
-
-// ChevronRight helper
-const ChevronRightIcon = (props) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-);
 
 export default Invoices;
