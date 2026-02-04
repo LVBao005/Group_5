@@ -19,8 +19,8 @@ public class MedicineDAO {
 
     public List<Medicine> getAllMedicines() throws SQLException {
         List<Medicine> medicines = new ArrayList<>();
-        String sql = "SELECT m.*, c.category_name FROM Medicines m " +
-                "JOIN Categories c ON m.category_id = c.category_id";
+        String sql = "SELECT m.*, c.category_name FROM medicines m " +
+                "JOIN categories c ON m.category_id = c.category_id";
 
         try (PreparedStatement ps = connection.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
@@ -33,8 +33,8 @@ public class MedicineDAO {
 
     public List<Medicine> searchMedicines(String query) throws SQLException {
         List<Medicine> medicines = new ArrayList<>();
-        String sql = "SELECT m.*, c.category_name FROM Medicines m " +
-                "JOIN Categories c ON m.category_id = c.category_id " +
+        String sql = "SELECT m.*, c.category_name FROM medicines m " +
+                "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE m.name LIKE ? OR m.brand LIKE ?";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -52,8 +52,8 @@ public class MedicineDAO {
     }
 
     public Medicine getMedicineById(int id) throws SQLException {
-        String sql = "SELECT m.*, c.category_name FROM Medicines m " +
-                "JOIN Categories c ON m.category_id = c.category_id " +
+        String sql = "SELECT m.*, c.category_name FROM medicines m " +
+                "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE m.medicine_id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);

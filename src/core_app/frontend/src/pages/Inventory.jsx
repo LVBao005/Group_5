@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Package,
     Search,
@@ -11,18 +11,28 @@ import {
     MoreVertical,
     Pill,
     ChevronRight,
-    User
+    User,
+    Upload,
+    Database,
+    TrendingUp,
+    Clock,
+    XCircle,
+    Eye,
+    Edit2,
+    Trash2
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
-import { MOCK_BRANCHES } from '../mockData'; // Still need branches
 import { cn } from '../lib/utils';
 import { inventoryService } from '../services/inventoryService';
 
 const Inventory = () => {
-    const [medicines, setMedicines] = useState([]); // This will hold flattened inventory items
+    const [medicines, setMedicines] = useState([]); // Master data
+    const [batches, setBatches] = useState([]); // Batch tracking data
+    const [activeTab, setActiveTab] = useState('batches'); // 'master' or 'batches'
     const [activeCategory, setActiveCategory] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [importProgress, setImportProgress] = useState(null);
 
     // Get user branch
     const userStr = localStorage.getItem('user');
@@ -34,7 +44,52 @@ const Inventory = () => {
         setLoading(true);
         try {
             const data = await inventoryService.getInventoryByBranch(branchId);
-            setMedicines(data);
+            
+            // Separate master data and batches
+            const masterMap = new Map();
+            const batchList = [];
+            
+            data.forEach(item => {
+                const key = item.medicine_id;
+                if (!masterMap.has(key)) {
+                    masterMap.set(key, {
+                        medicine_id: item.medicine_id,
+                        medicineName: item.medicine_name,
+                        activeIngredient: item.active_ingredient || 'N/A',
+                        categoryName: item.category_name,
+                        baseUnit: item.base_unit,
+                        subUnit: item.sub_unit,
+                        conversionRate: item.conversion_rate,
+                        retailPrice: item.base_sell_price || 0,
+                        brand: item.brand || 'Generic',
+                        totalStock: 0,
+                        batchCount: 0
+                    });
+                }
+                
+                const master = masterMap.get(key);
+                master.totalStock += item.quantity_std || 0;
+                master.batchCount += 1;
+                
+                batchList.push({
+                    batch_id: item.batch_id,
+                    medicine_id: item.medicine_id,
+                    medicineName: item.medicine_name,
+                    batchNumber: item.batch_number,
+                    importDate: item.import_date,
+                    expiryDate: item.expiry_date,
+                    quantityStd: item.quantity_std || 0,
+                    importPrice: item.import_price || 0,
+                    baseUnit: item.base_unit,
+                    subUnit: item.sub_unit,
+                    conversionRate: item.conversion_rate || 1,
+                    categoryName: item.category_name,
+                    status: getExpiryStatus(item.expiry_date)
+                });
+            });
+            
+            setMedicines(Array.from(masterMap.values()));
+            setBatches(batchList);
         } catch (error) {
             console.error("Failed to load inventory", error);
         } finally {
@@ -46,48 +101,95 @@ const Inventory = () => {
         loadData();
     }, [branchId]);
 
+    // Calculate expiry status
+    const getExpiryStatus = (expiryDate) => {
+        if (!expiryDate) return 'unknown';
+        
+        const today = new Date();
+        const expiry = new Date(expiryDate);
+        const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilExpiry < 0) return 'expired';
+        if (daysUntilExpiry <= 15) return 'critical';
+        if (daysUntilExpiry <= 90) return 'warning';
+        return 'good';
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'expired': return 'bg-rose-500/10 border-rose-500/20 text-rose-500';
+            case 'critical': return 'bg-rose-500/10 border-rose-500/20 text-rose-500';
+            case 'warning': return 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+            case 'good': return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500';
+            default: return 'bg-slate-500/10 border-slate-500/20 text-slate-500';
+        }
+    };
+
+    const getStatusLabel = (status) => {
+        switch (status) {
+            case 'expired': return 'Đã hết hạn';
+            case 'critical': return 'Gấp rút';
+            case 'warning': return 'Cảnh báo';
+            case 'good': return 'Tốt';
+            default: return 'Chưa rõ';
+        }
+    };
+
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        if (!file.name.endsWith('.csv')) {
+            alert("Vui lòng chọn file CSV!");
+            return;
+        }
+
         try {
             setLoading(true);
+            setImportProgress('Đang tải lên file...');
+            
             await inventoryService.importCSV(file, branchId);
-            alert("Import thành công!");
-            loadData(); // Refresh data
+            
+            setImportProgress('Import thành công!');
+            setTimeout(() => {
+                setImportProgress(null);
+                loadData(); // Refresh data
+            }, 2000);
         } catch (error) {
-            alert("Lỗi khi import file!");
+            setImportProgress('Lỗi khi import file!');
+            setTimeout(() => setImportProgress(null), 3000);
         } finally {
             setLoading(false);
             e.target.value = null; // Reset input
         }
     };
 
-    // Filter logic
+    // Filter logic for both tabs
     const filteredMedicines = medicines.filter(item => {
+        const matchesSearch = item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.activeIngredient?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = activeCategory === 'all' || item.categoryName === activeCategory;
+        return matchesSearch && matchesCategory;
+    });
+
+    const filteredBatches = batches.filter(item => {
         const matchesSearch = item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.batchNumber?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = activeCategory === 'all' || item.categoryName === activeCategory;
         return matchesSearch && matchesCategory;
     });
 
-    // Extract unique categories from real data
-    const categories = ['all', ...new Set(medicines.map(m => m.categoryName).filter(Boolean))];
+    // Extract unique categories
+    const categories = ['all', ...new Set(batches.map(m => m.categoryName).filter(Boolean))];
 
-    // Map filtered data to UI structure
-    const inventoryItems = filteredMedicines.map(item => ({
-        ...item,
-        name: item.medicineName,
-        batch_number: item.batchNumber,
-        expiry_date: item.expiryDate,
-        import_price_package: item.importPrice || 0, // Fallback if missing
-        base_unit: item.baseUnit,
-        sub_unit: item.subUnit,
-        brand: item.brand || 'Generic',
-        // Calculate display stock
-        boxQty: Math.floor(item.quantityStd / (item.conversionRate || 1)),
-        subQty: item.quantityStd % (item.conversionRate || 1)
-    }));
+    // Calculate statistics
+    const stats = {
+        totalMedicines: medicines.length,
+        totalBatches: batches.length,
+        expiringSoon: batches.filter(b => b.status === 'critical' || b.status === 'warning').length,
+        expired: batches.filter(b => b.status === 'expired').length,
+        totalValue: batches.reduce((sum, b) => sum + (b.quantityStd * b.importPrice), 0)
+    };
 
     return (
         <div className="flex h-screen bg-[#0d0f0e] text-slate-200 overflow-hidden font-sans">
@@ -102,18 +204,33 @@ const Inventory = () => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#00ff80] transition-colors" size={18} />
                         <input
                             type="text"
-                            placeholder="Tìm tên thuốc, mã lô, nhà sản xuất..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Tìm tên thuốc, mã lô, thành phần..."
                             className="w-full bg-[#1a1d1c] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#00ff80]/20 transition-all text-white"
                         />
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
+                        <label className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(59,130,246,0.2)] active:scale-95 cursor-pointer">
+                            <Upload size={16} strokeWidth={3} /> 
+                            Import CSV
+                            <input 
+                                type="file" 
+                                accept=".csv" 
+                                onChange={handleFileUpload} 
+                                className="hidden"
+                                disabled={loading}
+                            />
+                        </label>
                         <button className="bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95">
                             <Plus size={16} strokeWidth={3} /> Nhập kho
                         </button>
                         <div className="w-px h-8 bg-white/5" />
                         <div className="text-right hidden sm:block">
-                            <p className="text-sm font-black text-white leading-none">13:42:15</p>
+                            <p className="text-sm font-black text-white leading-none">
+                                {new Date().toLocaleTimeString('vi-VN')}
+                            </p>
                             <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">Hôm nay</p>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
@@ -122,15 +239,24 @@ const Inventory = () => {
                     </div>
                 </header>
 
+                {/* Import Progress */}
+                {importProgress && (
+                    <div className="mx-10 mb-4 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-3">
+                        <Database size={16} className="animate-pulse" />
+                        {importProgress}
+                    </div>
+                )}
+
                 {/* Inventory Content */}
                 <div className="flex-1 overflow-auto p-10 pt-4">
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
                         {[
-                            { label: 'Tổng mặt hàng', value: medicines.length, icon: Package, color: 'text-white' },
-                            { label: 'Sắp hết hạn', value: '12', icon: AlertTriangle, color: 'text-amber-500' },
-                            { label: 'Dưới định mức', value: '05', icon: ArrowDownRight, color: 'text-rose-500' },
-                            { label: 'Giá trị tồn kho', value: '1.2B', icon: TrendingUp, color: 'text-[#00ff80]' }
+                            { label: 'Tổng danh mục', value: stats.totalMedicines, icon: Database, color: 'text-white' },
+                            { label: 'Tổng lô hàng', value: stats.totalBatches, icon: Package, color: 'text-blue-400' },
+                            { label: 'Sắp hết hạn', value: stats.expiringSoon, icon: AlertTriangle, color: 'text-amber-500' },
+                            { label: 'Đã hết hạn', value: stats.expired, icon: XCircle, color: 'text-rose-500' },
+                            { label: 'Giá trị tồn', value: (stats.totalValue / 1000000000).toFixed(1) + 'B', icon: TrendingUp, color: 'text-[#00ff80]' }
                         ].map((stat, i) => (
                             <div key={i} className="bg-[#161a19] border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-[#00ff80]/20 transition-all">
                                 <div className="relative z-10">
@@ -144,8 +270,36 @@ const Inventory = () => {
                         ))}
                     </div>
 
+                    {/* Tab Navigation */}
+                    <div className="flex gap-4 mb-6">
+                        <button
+                            onClick={() => setActiveTab('batches')}
+                            className={cn(
+                                "px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-3",
+                                activeTab === 'batches' 
+                                    ? "bg-[#00ff80] text-[#04110b]" 
+                                    : "bg-[#161a19] border border-white/5 text-white/40 hover:text-white hover:border-white/10"
+                            )}
+                        >
+                            <Package size={18} />
+                            Quản lý Lô hàng
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('master')}
+                            className={cn(
+                                "px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-3",
+                                activeTab === 'master' 
+                                    ? "bg-[#00ff80] text-[#04110b]" 
+                                    : "bg-[#161a19] border border-white/5 text-white/40 hover:text-white hover:border-white/10"
+                            )}
+                        >
+                            <Database size={18} />
+                            Danh mục thuốc
+                        </button>
+                    </div>
+
                     {/* Filters & Table */}
-                    < div className="bg-[#161a19] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col" >
+                    <div className="bg-[#161a19] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
                         <div className="p-8 border-b border-white/5 flex items-center justify-between">
                             <div className="flex gap-2 overflow-auto scrollbar-hide pb-1">
                                 <button
@@ -170,90 +324,277 @@ const Inventory = () => {
                                     </button>
                                 ))}
                             </div>
-                            <button className="flex items-center gap-2 text-[10px] font-black text-white/20 uppercase tracking-widest hover:text-white transition-colors">
-                                <Filter size={14} /> Lọc nâng cao
-                            </button>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+                                    {activeTab === 'batches' ? `${filteredBatches.length} lô hàng` : `${filteredMedicines.length} thuốc`}
+                                </span>
+                                <button className="flex items-center gap-2 text-[10px] font-black text-white/20 uppercase tracking-widest hover:text-white transition-colors">
+                                    <Filter size={14} /> Lọc
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="overflow-auto min-h-[400px]">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">
-                                        <th className="py-6 px-10">Dược phẩm & Lô</th>
-                                        <th className="py-6">Ngày hết hạn</th>
-                                        <th className="py-6 text-right">Giá nhập</th>
-                                        <th className="py-6 text-center">Tồn kho hiện tại</th>
-                                        <th className="py-6 px-10 text-right">Trạng thái</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {inventoryItems.map((item, idx) => (
-                                        <tr key={`${item.medicine_id}-${item.batch_id}`} className="group hover:bg-white/[0.01] transition-colors">
-                                            <td className="py-6 px-10">
-                                                <div className="flex items-center gap-5">
-                                                    <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] transition-all duration-500">
-                                                        <Pill size={22} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-black text-white text-sm mb-1 group-hover:text-[#00ff80] transition-colors">{item.name}</p>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-[10px] text-[#00ff80]/60 font-black uppercase bg-[#00ff80]/5 px-2 py-0.5 rounded-md">Lô: {item.batch_number}</span>
-                                                            <span className="text-[10px] text-white/20 font-bold uppercase tracking-widest">{item.brand}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-6">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar size={14} className="text-white/10" />
-                                                    <span className={cn(
-                                                        "text-xs font-bold tabular-nums",
-                                                        new Date(item.expiry_date) < new Date('2026-06-01') ? "text-amber-500" : "text-white/40"
-                                                    )}>
-                                                        {new Date(item.expiry_date).toLocaleDateString('vi-VN')}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="py-6 text-right">
-                                                <p className="text-sm font-black text-white tabular-nums tracking-tighter">{item.import_price_package.toLocaleString()}</p>
-                                                <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">đ / {item.base_unit}</p>
-                                            </td>
-                                            <td className="py-6">
-                                                <div className="flex flex-col items-center">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="text-xl font-black text-[#00ff80] tabular-nums tracking-tighter">{item.boxQty}</span>
-                                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{item.base_unit}</span>
-                                                    </div>
-                                                    {item.subQty > 0 && (
-                                                        <div className="flex items-baseline gap-1.5 opacity-40">
-                                                            <Plus size={8} className="text-[#00ff80]" />
-                                                            <span className="text-xs font-bold text-white tabular-nums">{item.subQty}</span>
-                                                            <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{item.sub_unit}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="py-6 px-10 text-right">
-                                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#00ff80]/10 border border-[#00ff80]/10">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#00ff80] animate-pulse" />
-                                                    <span className="text-[9px] font-black text-[#00ff80] uppercase tracking-[0.2em]">Đang kinh doanh</span>
-                                                </div>
-                                            </td>
+                        {/* Batch Tracking Table */}
+                        {activeTab === 'batches' && (
+                            <div className="overflow-auto min-h-[400px]">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">
+                                            <th className="py-6 px-10">Thuốc & Mã lô</th>
+                                            <th className="py-6">Ngày nhập</th>
+                                            <th className="py-6">Hạn sử dụng</th>
+                                            <th className="py-6 text-right">Giá nhập</th>
+                                            <th className="py-6 text-center">Tồn kho lô</th>
+                                            <th className="py-6 px-10 text-right">Trạng thái</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div >
-                </div >
-            </main >
-        </div >
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan="6" className="py-20 text-center text-white/40">
+                                                    Đang tải dữ liệu...
+                                                </td>
+                                            </tr>
+                                        ) : filteredBatches.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" className="py-20 text-center text-white/40">
+                                                    Không tìm thấy dữ liệu
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredBatches.map((batch) => {
+                                                const boxQty = Math.floor(batch.quantityStd / (batch.conversionRate || 1));
+                                                const subQty = batch.quantityStd % (batch.conversionRate || 1);
+                                                
+                                                return (
+                                                    <tr key={batch.batch_id} className="group hover:bg-white/[0.01] transition-colors">
+                                                        <td className="py-6 px-10">
+                                                            <div className="flex items-center gap-5">
+                                                                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] transition-all duration-500">
+                                                                    <Pill size={22} />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-black text-white text-sm mb-1 group-hover:text-[#00ff80] transition-colors">
+                                                                        {batch.medicineName}
+                                                                    </p>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-[10px] text-[#00ff80]/60 font-black uppercase bg-[#00ff80]/5 px-2 py-0.5 rounded-md">
+                                                                            Lô: {batch.batchNumber}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-white/20 font-bold uppercase tracking-widest">
+                                                                            {batch.categoryName}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <div className="flex items-center gap-2">
+                                                                <Calendar size={14} className="text-white/10" />
+                                                                <span className="text-xs font-bold tabular-nums text-white/40">
+                                                                    {batch.importDate ? new Date(batch.importDate).toLocaleDateString('vi-VN') : 'N/A'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock size={14} className={cn(
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
+                                                                    batch.status === 'warning' ? 'text-amber-500' : 'text-white/10'
+                                                                )} />
+                                                                <span className={cn(
+                                                                    "text-xs font-bold tabular-nums",
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
+                                                                    batch.status === 'warning' ? 'text-amber-500' : 'text-white/40'
+                                                                )}>
+                                                                    {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('vi-VN') : 'N/A'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6 text-right">
+                                                            <p className="text-sm font-black text-white tabular-nums tracking-tighter">
+                                                                {batch.importPrice.toLocaleString()}
+                                                            </p>
+                                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">
+                                                                đ / {batch.baseUnit}
+                                                            </p>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="text-xl font-black text-[#00ff80] tabular-nums tracking-tighter">
+                                                                        {boxQty}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+                                                                        {batch.baseUnit}
+                                                                    </span>
+                                                                </div>
+                                                                {subQty > 0 && (
+                                                                    <div className="flex items-baseline gap-1.5 opacity-40">
+                                                                        <Plus size={8} className="text-[#00ff80]" />
+                                                                        <span className="text-xs font-bold text-white tabular-nums">{subQty}</span>
+                                                                        <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest">
+                                                                            {batch.subUnit}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6 px-10 text-right">
+                                                            <div className={cn(
+                                                                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full border",
+                                                                getStatusColor(batch.status)
+                                                            )}>
+                                                                <div className={cn(
+                                                                    "w-1.5 h-1.5 rounded-full",
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'bg-rose-500 animate-pulse' :
+                                                                    batch.status === 'warning' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                                                                )} />
+                                                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                                                                    {getStatusLabel(batch.status)}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* Master Data Table */}
+                        {activeTab === 'master' && (
+                            <div className="overflow-auto min-h-[400px]">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">
+                                            <th className="py-6 px-10">Tên thuốc</th>
+                                            <th className="py-6">Thành phần</th>
+                                            <th className="py-6">Danh mục</th>
+                                            <th className="py-6 text-center">Đơn vị tính</th>
+                                            <th className="py-6 text-right">Giá bán lẻ</th>
+                                            <th className="py-6 text-center">Số lô</th>
+                                            <th className="py-6 text-center">Tổng tồn</th>
+                                            <th className="py-6 px-10 text-center">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan="8" className="py-20 text-center text-white/40">
+                                                    Đang tải dữ liệu...
+                                                </td>
+                                            </tr>
+                                        ) : filteredMedicines.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="8" className="py-20 text-center text-white/40">
+                                                    Không tìm thấy dữ liệu
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredMedicines.map((medicine) => {
+                                                const boxQty = Math.floor(medicine.totalStock / (medicine.conversionRate || 1));
+                                                const subQty = medicine.totalStock % (medicine.conversionRate || 1);
+                                                
+                                                return (
+                                                    <tr key={medicine.medicine_id} className="group hover:bg-white/[0.01] transition-colors">
+                                                        <td className="py-6 px-10">
+                                                            <div className="flex items-center gap-5">
+                                                                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/20 group-hover:bg-[#00ff80]/10 group-hover:text-[#00ff80] transition-all duration-500">
+                                                                    <Pill size={22} />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-black text-white text-sm mb-1 group-hover:text-[#00ff80] transition-colors">
+                                                                        {medicine.medicineName}
+                                                                    </p>
+                                                                    <span className="text-[10px] text-white/20 font-bold uppercase tracking-widest">
+                                                                        {medicine.brand}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <p className="text-xs text-white/60 font-medium max-w-xs">
+                                                                {medicine.activeIngredient}
+                                                            </p>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <span className="text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-full border border-blue-500/20">
+                                                                {medicine.categoryName}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-6 text-center">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className="text-xs font-bold text-white">
+                                                                    {medicine.baseUnit}
+                                                                </span>
+                                                                <div className="flex items-center gap-1 text-[10px] text-white/40">
+                                                                    <span>1 {medicine.baseUnit} = {medicine.conversionRate} {medicine.subUnit}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6 text-right">
+                                                            <p className="text-sm font-black text-[#00ff80] tabular-nums tracking-tighter">
+                                                                {medicine.retailPrice.toLocaleString()}
+                                                            </p>
+                                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">
+                                                                VNĐ
+                                                            </p>
+                                                        </td>
+                                                        <td className="py-6 text-center">
+                                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 text-white font-black text-xs">
+                                                                {medicine.batchCount}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-6">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="text-xl font-black text-white tabular-nums tracking-tighter">
+                                                                        {boxQty}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+                                                                        {medicine.baseUnit}
+                                                                    </span>
+                                                                </div>
+                                                                {subQty > 0 && (
+                                                                    <div className="flex items-baseline gap-1.5 opacity-40">
+                                                                        <Plus size={8} className="text-white" />
+                                                                        <span className="text-xs font-bold text-white tabular-nums">{subQty}</span>
+                                                                        <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest">
+                                                                            {medicine.subUnit}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-6 px-10">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-blue-500/20 text-white/40 hover:text-blue-400 transition-all flex items-center justify-center">
+                                                                    <Eye size={14} />
+                                                                </button>
+                                                                <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-[#00ff80]/20 text-white/40 hover:text-[#00ff80] transition-all flex items-center justify-center">
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-rose-500/20 text-white/40 hover:text-rose-400 transition-all flex items-center justify-center">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </main>
+        </div>
     );
 };
-
-// Placeholder icons helper
-const TrendingUp = (props) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-);
 
 export default Inventory;

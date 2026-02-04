@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = '/api'; // Placeholder for backend root
+import axios from '../api/axios';
 
 /**
  * Service to handle pharmacy invoices
@@ -25,7 +23,7 @@ export const invoiceService = {
             //   details: [
             //     {
             //       batch_id: 101,
-            //       unit_sold: 'HỘP',
+            //       unit_sold: 'Hộp',
             //       quantity_sold: 1,
             //       unit_price: 120000,
             //       total_std_quantity: 100 // (1 Hộp * 100 conversion_rate)
@@ -33,7 +31,7 @@ export const invoiceService = {
             //   ]
             // }
 
-            const response = await axios.post(`${API_URL}/invoices`, invoiceData);
+            const response = await axios.post('/invoices', invoiceData);
             return response.data;
         } catch (error) {
             console.error('Error creating invoice:', error);
@@ -43,7 +41,7 @@ export const invoiceService = {
 
     /**
      * Get all invoices with full details
-     * @param {Object} filters - Optional filters (dateFrom, dateTo, pharmacistId, isSimulated)
+     * @param {Object} filters - Optional filters (dateFrom, dateTo, pharmacistId, branchId, isSimulated)
      * @returns {Promise<Array>} Array of invoices with details
      */
     getInvoices: async (filters = {}) => {
@@ -53,9 +51,10 @@ export const invoiceService = {
             if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
             if (filters.dateTo) params.append('dateTo', filters.dateTo);
             if (filters.pharmacistId) params.append('pharmacistId', filters.pharmacistId);
+            if (filters.branchId) params.append('branchId', filters.branchId);
             if (filters.isSimulated !== undefined) params.append('isSimulated', filters.isSimulated);
             
-            const response = await axios.get(`${API_URL}/invoices?${params.toString()}`);
+            const response = await axios.get(`/invoices?${params.toString()}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching invoices:', error);
@@ -70,7 +69,7 @@ export const invoiceService = {
      */
     getInvoiceById: async (invoiceId) => {
         try {
-            const response = await axios.get(`${API_URL}/invoices/${invoiceId}`);
+            const response = await axios.get(`/invoices/${invoiceId}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching invoice details:', error);
@@ -90,7 +89,7 @@ export const invoiceService = {
             if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
             if (filters.dateTo) params.append('dateTo', filters.dateTo);
             
-            const response = await axios.get(`${API_URL}/invoices/stats?${params.toString()}`);
+            const response = await axios.get(`/invoices/stats?${params.toString()}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching invoice stats:', error);
@@ -105,7 +104,7 @@ export const invoiceService = {
      */
     searchInvoices: async (searchTerm) => {
         try {
-            const response = await axios.get(`${API_URL}/invoices/search`, {
+            const response = await axios.get('/invoices/search', {
                 params: { q: searchTerm }
             });
             return response.data;

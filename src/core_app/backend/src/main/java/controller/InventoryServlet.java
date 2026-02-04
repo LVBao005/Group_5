@@ -24,7 +24,10 @@ public class InventoryServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         this.inventoryDAO = new InventoryDAO();
-        this.gson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
+        this.gson = new GsonBuilder()
+                .setDateFormat("yyyy-MM-dd")
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                .create();
     }
 
     @Override
@@ -43,7 +46,15 @@ public class InventoryServlet extends HttpServlet {
                 branchId = Integer.parseInt(branchIdStr);
             }
 
-            List<Inventory> inventory = inventoryDAO.getInventoryByBranch(branchId);
+            String query = request.getParameter("q");
+            List<Inventory> inventory;
+
+            if (query != null && !query.trim().isEmpty()) {
+                inventory = inventoryDAO.searchInventoryForPOS(branchId, query);
+            } else {
+                inventory = inventoryDAO.getInventoryByBranch(branchId);
+            }
+
             out.print(gson.toJson(inventory));
 
         } catch (Exception e) {

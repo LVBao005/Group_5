@@ -1,5 +1,24 @@
 # Backend - Group 5
 
+Danh sách 9 đường link API chuẩn:
+Y Quản lý Thuốc: http://localhost:8080/backend/api/medicines
+
+Y Quản lý Lô hàng: http://localhost:8080/backend/api/batches
+
+Y Quản lý Tồn kho: http://localhost:8080/backend/api/inventory
+
+Y Quản lý Chi nhánh: http://localhost:8080/backend/api/branches
+
+Y Quản lý Danh mục: http://localhost:8080/backend/api/categories
+
+Y Quản lý Dược sĩ: http://localhost:8080/backend/api/pharmacists
+
+Y Quản lý Khách hàng: http://localhost:8080/backend/api/customers
+
+Y Quản lý Hóa đơn: http://localhost:8080/backend/api/invoices
+
+Y Chi tiết Hóa đơn: http://localhost:8080/backend/api/invoice-details
+
 Dự án Java Web (JSP/Servlet) cho Group 5.
 
 ## Cấu trúc thư mục
