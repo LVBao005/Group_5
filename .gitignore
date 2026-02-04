@@ -1,4 +1,43 @@
+# --- JAVA / MAVEN / GRADLE ---
+*.class
+*.log
+*.jar
+*.war
+*.ear
+target/
+.gradle/
+build/
+bin/
+
+# --- NODE / REACT / JAVASCRIPT ---
 node_modules/
 dist/
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- VS CODE / IDE ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.settings/
+.project
+.classpath
+
+# --- OS / SYSTEM ---
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# --- DATABASE (Dành cho file SQL của bạn) ---
+# Nếu bạn muốn giữ file SQL mẫu thì xóa dòng dưới đi
+# *.sql
