@@ -26,11 +26,11 @@ const Sidebar = () => {
     };
 
     const menuItems = [
-        { icon: ShoppingCart, label: 'Bán hàng', path: '/pos' },
-        { icon: Receipt, label: 'Hóa đơn', path: '/invoices' },
-        { icon: LayoutDashboard, label: 'Báo cáo', path: '/dashboard' },
-        { icon: Package, label: 'Kho thuốc', path: '/inventory' },
-    ];
+        { icon: ShoppingCart, label: 'Bán hàng', path: '/pos', roles: ['ADMIN', 'STAFF'] },
+        { icon: Receipt, label: 'Hóa đơn', path: '/invoices', roles: ['ADMIN', 'STAFF'] },
+        { icon: LayoutDashboard, label: 'Báo cáo', path: '/dashboard', roles: ['ADMIN'] },
+        { icon: Package, label: 'Kho thuốc', path: '/inventory', roles: ['ADMIN'] },
+    ].filter(item => item.roles.includes(user?.role || 'STAFF'));
 
     return (
         <aside className="w-64 bg-[#0a0a0b] border-r border-white/5 flex flex-col h-screen sticky top-0 shrink-0">

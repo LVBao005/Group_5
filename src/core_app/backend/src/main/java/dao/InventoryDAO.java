@@ -12,6 +12,9 @@ public class InventoryDAO {
     public InventoryDAO() {
         try {
             this.connection = new DBContext().getConnection();
+            if (this.connection != null) {
+                this.connection.setAutoCommit(false);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -122,7 +125,11 @@ public class InventoryDAO {
                     psInv.setInt(3, quantity);
                     psInv.executeUpdate();
                 }
+                connection.commit();
             }
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
         }
     }
 
@@ -133,6 +140,10 @@ public class InventoryDAO {
             ps.setInt(2, branchId);
             ps.setInt(3, batchId);
             ps.executeUpdate();
+            connection.commit();
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
         }
     }
 }

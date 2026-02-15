@@ -40,6 +40,8 @@ const POS = () => {
     const [success, setSuccess] = useState(false);
     const [phone, setPhone] = useState('');
     const [customerName, setCustomerName] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
     // Get current user and branch for the invoice
     const userStr = localStorage.getItem('user');
@@ -94,20 +96,20 @@ const POS = () => {
                     // If quantity_std seems to be in sub-units (abnormally high), convert it
                     m.total_stock = m.batches.reduce((sum, b) => {
                         let qty = b.quantity_std;
-                        
+
                         // Auto-detect: If quantity seems to be in sub-units (too large), convert to base
                         // Heuristic: If conversion_rate exists and quantity > 500, likely in sub-units
                         if (m.conversion_rate && m.conversion_rate > 1 && qty > 500) {
                             qty = Math.floor(qty / m.conversion_rate);
                             console.warn(`⚠️ ${m.name}: Auto-converted ${b.quantity_std} → ${qty} ${m.base_unit} (÷${m.conversion_rate})`);
                         }
-                        
+
                         return sum + qty;
                     }, 0);
-                    
+
                     // Sort batches by expiry (FIFO)
                     m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
-                    
+
                     // Debug: Log stock calculation for Hapacol
                     if (m.name?.includes('Hapacol')) {
                         console.log(`📦 ${m.name}:`, {
@@ -117,13 +119,13 @@ const POS = () => {
                             conversion_rate: m.conversion_rate
                         });
                     }
-                    
+
                     return m;
                 });
 
                 setMedicines(medicinesList);
                 setCategories(Array.from(cats).map(c => JSON.parse(c)));
-                
+
                 // Initialize available stock (same as total_stock initially)
                 const stockMap = {};
                 medicinesList.forEach(m => {
@@ -142,6 +144,14 @@ const POS = () => {
     const filteredMedicines = activeCategory === 0
         ? medicines
         : medicines.filter(m => m.category_id === activeCategory);
+
+    // Search results for autocomplete (Limit 5)
+    const searchResults = searchTerm.trim() === ''
+        ? []
+        : medicines.filter(m =>
+            (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (m.brand || '').toLowerCase().includes(searchTerm.toLowerCase())
+        ).slice(0, 5);
 
     // Pagination Logic (Only for "All" category)
     const displayMedicines = activeCategory === 0
@@ -172,7 +182,20 @@ const POS = () => {
     const handleUpdateLocalQty = (id, delta) => {
         setQuantities(prev => ({
             ...prev,
-            [id]: Math.max(1, (prev[id] || 1) + delta)
+            [id]: Math.max(0, (prev[id] || 1) + delta)
+        }));
+    };
+
+    const handleManualQtyChange = (id, value) => {
+        if (value === '') {
+            setQuantities(prev => ({ ...prev, [id]: '' }));
+            return;
+        }
+        const val = parseInt(value);
+        if (isNaN(val)) return;
+        setQuantities(prev => ({
+            ...prev,
+            [id]: Math.max(0, val) // Allow 0 during typing
         }));
     };
 
@@ -184,7 +207,8 @@ const POS = () => {
     };
 
     const addToCart = (medicine) => {
-        const qty = quantities[medicine.medicine_id] || 1;
+        const qty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 1;
+        if (qty <= 0) return; // Don't add if quantity is 0
         const unitType = selectedUnits[medicine.medicine_id] || 'base';
         const isSub = unitType === 'sub';
 
@@ -237,7 +261,7 @@ const POS = () => {
 
         const conversion = medicine.conversion_rate || 1;
         const isSub = item.unit === medicine.sub_unit;
-        
+
         // Calculate how much to restore in BASE units
         const restoreQuota = isSub ? Math.ceil(item.quantity / conversion) : item.quantity;
 
@@ -284,7 +308,7 @@ const POS = () => {
 
         // Debug: Check user data
         console.log('👤 Current user:', user);
-        
+
         // Check if user is logged in (either pharmacist_id or username exists)
         if (!user || (!user.pharmacist_id && !user.username)) {
             alert('Lỗi: Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại!');
@@ -354,7 +378,7 @@ const POS = () => {
                 setPhone('');
                 setCustomerName('');
                 setLoading(false);
-                
+
                 // Reload inventory data to refresh stock
                 window.location.reload();
             }, 1500);
@@ -379,9 +403,51 @@ const POS = () => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#00ff80] transition-colors" size={18} />
                         <input
                             type="text"
-                            placeholder="Tìm tên thuốc, mã vạch..."
+                            placeholder="Tìm tên thuốc, thương hiệu..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setShowSearchDropdown(true);
+                            }}
+                            onFocus={() => setShowSearchDropdown(true)}
                             className="w-full bg-[#1a1d1c] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#00ff80]/20 transition-all text-white"
                         />
+
+                        {/* Autocomplete Dropdown */}
+                        {showSearchDropdown && searchResults.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1d1c] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                                {searchResults.map((medicine) => (
+                                    <button
+                                        key={`search-${medicine.medicine_id}`}
+                                        onClick={() => {
+                                            addToCart(medicine);
+                                            setSearchTerm('');
+                                            setShowSearchDropdown(false);
+                                        }}
+                                        className="w-full flex items-center gap-4 px-6 py-4 hover:bg-[#00ff80]/5 transition-colors border-b border-white/5 last:border-0 text-left group/item"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover/item:text-[#00ff80] transition-colors">
+                                            <Pill size={20} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-white truncate">{medicine.name}</p>
+                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">{medicine.brand || 'No Brand'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-black text-[#00ff80]">{formatPrice(medicine.base_sell_price)}đ</p>
+                                            <p className="text-[10px] text-white/20 font-bold uppercase">Còn: {medicine.total_stock} {medicine.base_unit}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Close dropdown on click outside logic is usually handling with a global listener or a transparent overlay, 
+                            but for this implementation Plan we'll keep it simple or add a backdrop if needed. 
+                            Let's add a simple overlay to handle clicks outside. */}
+                        {showSearchDropdown && searchTerm.length > 0 && (
+                            <div className="fixed inset-0 z-[55]" onClick={() => setShowSearchDropdown(false)} />
+                        )}
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
@@ -425,15 +491,15 @@ const POS = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start mb-auto">
                         {displayMedicines.map(medicine => {
                             if (!medicine) return null; // Defensive check
-                            const localQty = quantities[medicine.medicine_id] || 1;
+                            const localQty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 1;
                             const selectedUnit = selectedUnits[medicine.medicine_id] || 'base';
                             const displayPrice = selectedUnit === 'sub' ? medicine.sub_sell_price : medicine.base_sell_price;
                             const displayUnit = selectedUnit === 'sub' ? medicine.sub_unit : medicine.base_unit;
-                            
+
                             // Calculate available stock in the selected unit
                             const baseStock = availableStock[medicine.medicine_id] || 0;
                             const conversionRate = medicine.conversion_rate || 1;
-                            const displayStock = selectedUnit === 'sub' 
+                            const displayStock = selectedUnit === 'sub'
                                 ? Math.floor(baseStock * conversionRate)  // Convert to sub-units (e.g., 10 boxes * 100 = 1000 pills)
                                 : baseStock; // Keep as base units
 
@@ -444,15 +510,15 @@ const POS = () => {
                                         {medicine.category_name}
                                     </div>
 
-                                    <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>                                    
+                                    <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>
                                     {/* Available Stock Display - Shows in selected unit */}
                                     <div className="flex items-center gap-2 mb-1">
                                         <PackageSearch size={14} className="text-white/30" />
                                         <span className={cn(
                                             "text-xs font-bold",
                                             displayStock === 0 ? "text-red-400" :
-                                            displayStock < (selectedUnit === 'sub' ? 100 : 10) ? "text-yellow-400" :
-                                            "text-white/50"
+                                                displayStock < (selectedUnit === 'sub' ? 100 : 10) ? "text-yellow-400" :
+                                                    "text-white/50"
                                         )}>
                                             Còn: {displayStock} {displayUnit}
                                         </span>
@@ -484,7 +550,22 @@ const POS = () => {
                                             >
                                                 <Minus size={14} />
                                             </button>
-                                            <span className="font-black text-white tabular-nums">{localQty}</span>
+                                            <input
+                                                type="number"
+                                                value={localQty}
+                                                placeholder="1"
+                                                onChange={(e) => handleManualQtyChange(medicine.medicine_id, e.target.value)}
+                                                onFocus={(e) => {
+                                                    handleManualQtyChange(medicine.medicine_id, '');
+                                                    e.target.select();
+                                                }}
+                                                onBlur={() => {
+                                                    if (localQty === '' || localQty <= 0) {
+                                                        handleManualQtyChange(medicine.medicine_id, 1);
+                                                    }
+                                                }}
+                                                className="w-12 bg-transparent text-center font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-white/20"
+                                            />
                                             <button
                                                 onClick={() => handleUpdateLocalQty(medicine.medicine_id, 1)}
                                                 className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-[#00ff80] hover:bg-white/10 transition-all font-bold"
@@ -502,7 +583,7 @@ const POS = () => {
                                                     : "bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
                                             )}
                                         >
-                                            <ShoppingCart size={16} strokeWidth={3} /> 
+                                            <ShoppingCart size={16} strokeWidth={3} />
                                             {displayStock === 0 ? "Hết hàng" : "Thêm vào giỏ"}
                                         </button>
                                     </div>
@@ -570,8 +651,9 @@ const POS = () => {
             </main>
 
             {/* Right Sidebar: Cart Panel */}
-            <aside className="w-[440px] border-l border-white/5 bg-[#0d0f0e] flex flex-col shrink-0 p-8">
-                <div className="bg-[#161a19] border border-white/5 rounded-[2.5rem] flex-1 flex flex-col p-8 shadow-2xl overflow-hidden relative">
+            <aside className="w-[440px] border-l border-[#00ff80]/10 bg-[#141415] flex flex-col shrink-0 p-8 shadow-[-20px_0_50px_rgba(0,0,0,0.5)]">
+
+                <div className="bg-[#1c1c1e] border border-white/5 rounded-[2.5rem] flex-1 flex flex-col p-8 shadow-2xl overflow-hidden relative">
                     <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-3">
                             <h2 className="text-xl font-black text-white">Giỏ hàng</h2>
@@ -593,9 +675,14 @@ const POS = () => {
                     {/* Cart Items List */}
                     <div className="flex-1 overflow-auto -mx-2 px-2 scrollbar-hide py-2">
                         {cart.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-white/10 gap-6 opacity-30">
-                                <PackageSearch size={80} strokeWidth={1} />
-                                <p className="font-black uppercase tracking-[0.2em] text-sm">Giỏ hàng trống</p>
+                            <div className="h-full flex flex-col items-center justify-center gap-6 group/empty">
+                                <div className="p-8 rounded-full bg-[#00ff80]/5 border border-[#00ff80]/10 group-hover/empty:scale-110 group-hover/empty:bg-[#00ff80]/10 transition-all duration-500">
+                                    <PackageSearch size={80} strokeWidth={1} className="text-[#00ff80]/40 group-hover/empty:text-[#00ff80]/60" />
+                                </div>
+                                <div className="text-center">
+                                    <p className="font-black uppercase tracking-[0.25em] text-xs text-[#00ff80]/60 mb-2">Giỏ hàng trống</p>
+                                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest italic">"Sẵn sàng phục vụ khách hàng!"</p>
+                                </div>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -649,16 +736,21 @@ const POS = () => {
                                 <span className="font-black text-white/40 tabular-nums">{formatPrice(totalAmount)} đ</span>
                             </div>
                             <div className="flex justify-between items-end px-2 pt-2">
-                                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Tổng thanh toán</span>
-                                <span className="text-3xl font-black text-[#00ff80] tracking-tighter tabular-nums leading-none">
-                                    {formatPrice(totalAmount)} <span className="text-xs ml-1 font-black">đ</span>
+                                <span className="text-xs font-black text-white uppercase tracking-[0.2em]">Tổng thanh toán</span>
+                                <span className="text-3xl font-black text-white tracking-tighter tabular-nums leading-none">
+                                    {formatPrice(totalAmount)} <span className="text-xs ml-1 font-black opacity-30 text-white">đ</span>
                                 </span>
                             </div>
                         </div>
 
                         <button
                             onClick={handleCheckout}
-                            className="w-full bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-[0.2em] text-sm py-5 rounded-2xl shadow-[0_15px_30px_rgba(0,255,128,0.2)] transition-all transform active:scale-[0.98] disabled:opacity-20 flex items-center justify-center gap-3"
+                            className={cn(
+                                "w-full font-black uppercase tracking-[0.25em] text-sm py-5 rounded-2xl transition-all transform active:scale-95 disabled:opacity-20 flex items-center justify-center gap-3",
+                                cart.length > 0
+                                    ? "bg-[#00ff80] text-[#04110b] shadow-[0_15px_40px_rgba(0,255,128,0.3)] hover:shadow-[0_20px_50px_rgba(0,255,128,0.4)] hover:-translate-y-0.5"
+                                    : "bg-white/5 text-white/20 border border-white/5"
+                            )}
                             disabled={cart.length === 0}
                         >
                             <CheckCircle size={20} strokeWidth={3} />
