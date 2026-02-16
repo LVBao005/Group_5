@@ -687,16 +687,16 @@ const POS = () => {
                         ) : (
                             <div className="space-y-4">
                                 {cart.map(item => (
-                                    <div key={item.medicine_id} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-4 hover:border-white/10 transition-all group">
+                                    <div key={item.medicine_id} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-0 hover:border-white/10 transition-all group">
                                         <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/40 group-hover:text-[#00ff80] transition-colors">
                                             {React.createElement(getIcon(item.icon), { size: 20 })}
                                         </div>
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1">
                                             <p className="font-bold text-white text-sm truncate">{item.name}</p>
                                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} x {formatPrice(item.price)}đ</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}</p>
+                                            <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}đ</p>
                                         </div>
                                         <button
                                             onClick={() => removeFromCart(item)}
