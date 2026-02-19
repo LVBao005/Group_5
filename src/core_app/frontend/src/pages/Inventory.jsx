@@ -43,12 +43,19 @@ const Inventory = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const data = await inventoryService.getInventoryByBranch(branchId);
-            
+            const response = await inventoryService.getInventoryByBranch(branchId);
+
+            if (!response || !response.success || !Array.from(response.data)) {
+                console.error("Invalid inventory response:", response);
+                return;
+            }
+
+            const data = response.data;
+
             // Separate master data and batches
             const masterMap = new Map();
             const batchList = [];
-            
+
             data.forEach(item => {
                 const key = item.medicine_id;
                 if (!masterMap.has(key)) {
@@ -66,11 +73,11 @@ const Inventory = () => {
                         batchCount: 0
                     });
                 }
-                
+
                 const master = masterMap.get(key);
                 master.totalStock += item.quantity_std || 0;
                 master.batchCount += 1;
-                
+
                 batchList.push({
                     batch_id: item.batch_id,
                     medicine_id: item.medicine_id,
@@ -87,7 +94,7 @@ const Inventory = () => {
                     status: getExpiryStatus(item.expiry_date)
                 });
             });
-            
+
             setMedicines(Array.from(masterMap.values()));
             setBatches(batchList);
         } catch (error) {
@@ -104,11 +111,11 @@ const Inventory = () => {
     // Calculate expiry status
     const getExpiryStatus = (expiryDate) => {
         if (!expiryDate) return 'unknown';
-        
+
         const today = new Date();
         const expiry = new Date(expiryDate);
         const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-        
+
         if (daysUntilExpiry < 0) return 'expired';
         if (daysUntilExpiry <= 15) return 'critical';
         if (daysUntilExpiry <= 90) return 'warning';
@@ -147,9 +154,9 @@ const Inventory = () => {
         try {
             setLoading(true);
             setImportProgress('Đang tải lên file...');
-            
+
             await inventoryService.importCSV(file, branchId);
-            
+
             setImportProgress('Import thành công!');
             setTimeout(() => {
                 setImportProgress(null);
@@ -213,12 +220,12 @@ const Inventory = () => {
 
                     <div className="flex items-center gap-6 ml-auto">
                         <label className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(59,130,246,0.2)] active:scale-95 cursor-pointer">
-                            <Upload size={16} strokeWidth={3} /> 
+                            <Upload size={16} strokeWidth={3} />
                             Import CSV
-                            <input 
-                                type="file" 
-                                accept=".csv" 
-                                onChange={handleFileUpload} 
+                            <input
+                                type="file"
+                                accept=".csv"
+                                onChange={handleFileUpload}
                                 className="hidden"
                                 disabled={loading}
                             />
@@ -276,8 +283,8 @@ const Inventory = () => {
                             onClick={() => setActiveTab('batches')}
                             className={cn(
                                 "px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-3",
-                                activeTab === 'batches' 
-                                    ? "bg-[#00ff80] text-[#04110b]" 
+                                activeTab === 'batches'
+                                    ? "bg-[#00ff80] text-[#04110b]"
                                     : "bg-[#161a19] border border-white/5 text-white/40 hover:text-white hover:border-white/10"
                             )}
                         >
@@ -288,8 +295,8 @@ const Inventory = () => {
                             onClick={() => setActiveTab('master')}
                             className={cn(
                                 "px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-3",
-                                activeTab === 'master' 
-                                    ? "bg-[#00ff80] text-[#04110b]" 
+                                activeTab === 'master'
+                                    ? "bg-[#00ff80] text-[#04110b]"
                                     : "bg-[#161a19] border border-white/5 text-white/40 hover:text-white hover:border-white/10"
                             )}
                         >
@@ -365,7 +372,7 @@ const Inventory = () => {
                                             filteredBatches.map((batch) => {
                                                 const boxQty = Math.floor(batch.quantityStd / (batch.conversionRate || 1));
                                                 const subQty = batch.quantityStd % (batch.conversionRate || 1);
-                                                
+
                                                 return (
                                                     <tr key={batch.batch_id} className="group hover:bg-white/[0.01] transition-colors">
                                                         <td className="py-6 px-10">
@@ -400,12 +407,12 @@ const Inventory = () => {
                                                             <div className="flex items-center gap-2">
                                                                 <Clock size={14} className={cn(
                                                                     batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
-                                                                    batch.status === 'warning' ? 'text-amber-500' : 'text-white/10'
+                                                                        batch.status === 'warning' ? 'text-amber-500' : 'text-white/10'
                                                                 )} />
                                                                 <span className={cn(
                                                                     "text-xs font-bold tabular-nums",
                                                                     batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
-                                                                    batch.status === 'warning' ? 'text-amber-500' : 'text-white/40'
+                                                                        batch.status === 'warning' ? 'text-amber-500' : 'text-white/40'
                                                                 )}>
                                                                     {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('vi-VN') : 'N/A'}
                                                                 </span>
@@ -448,7 +455,7 @@ const Inventory = () => {
                                                                 <div className={cn(
                                                                     "w-1.5 h-1.5 rounded-full",
                                                                     batch.status === 'expired' || batch.status === 'critical' ? 'bg-rose-500 animate-pulse' :
-                                                                    batch.status === 'warning' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                                                                        batch.status === 'warning' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
                                                                 )} />
                                                                 <span className="text-[9px] font-black uppercase tracking-[0.2em]">
                                                                     {getStatusLabel(batch.status)}
@@ -497,7 +504,7 @@ const Inventory = () => {
                                             filteredMedicines.map((medicine) => {
                                                 const boxQty = Math.floor(medicine.totalStock / (medicine.conversionRate || 1));
                                                 const subQty = medicine.totalStock % (medicine.conversionRate || 1);
-                                                
+
                                                 return (
                                                     <tr key={medicine.medicine_id} className="group hover:bg-white/[0.01] transition-colors">
                                                         <td className="py-6 px-10">

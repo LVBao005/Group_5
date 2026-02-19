@@ -55,7 +55,16 @@ const POS = () => {
         const fetchData = async () => {
             try {
                 // Fetch inventory for current branch (default 1)
-                const inventoryData = await inventoryService.getInventoryByBranch(user?.branch_id || 1);
+                const response = await inventoryService.getInventoryByBranch(user?.branch_id || 1);
+
+                // Check if response is successful and has data
+                if (!response || !response.success || !Array.from(response.data)) {
+                    console.error("Invalid inventory data structure:", response);
+                    setLoading(false);
+                    return;
+                }
+
+                const inventoryData = response.data;
 
                 // Process inventory into Medicines with Batches
                 const grouped = {};

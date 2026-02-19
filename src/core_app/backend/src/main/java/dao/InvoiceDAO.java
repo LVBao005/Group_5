@@ -38,6 +38,7 @@ public class InvoiceDAO {
         PreparedStatement psInvoice = null;
         PreparedStatement psDetail = null;
         PreparedStatement psUpdateInventory = null;
+        PreparedStatement psUpdateBatch = null;
         ResultSet rs = null;
 
         try {
@@ -57,12 +58,12 @@ public class InvoiceDAO {
                 if (customerPhone != null && !customerPhone.trim().isEmpty()) {
                     CustomerDAO customerDAO = new CustomerDAO();
                     Customer customer = customerDAO.getCustomerByPhone(customerPhone);
-                    
+
                     if (customer == null) {
                         // Create new customer with phone and optional name
                         customer = new Customer();
                         customer.setPhoneNumber(customerPhone);
-                        
+
                         // Get customer name from request (optional)
                         String customerName = null;
                         if (jsonData.has("customer_name") && !jsonData.get("customer_name").isJsonNull()) {
@@ -71,13 +72,13 @@ public class InvoiceDAO {
                                 customer.setCustomerName(customerName.trim());
                             }
                         }
-                        
+
                         customerDAO.createCustomer(customer);
-                        
+
                         // Get the newly created customer
                         customer = customerDAO.getCustomerByPhone(customerPhone);
                     }
-                    
+
                     if (customer != null) {
                         customerId = customer.getCustomerId();
                     }
@@ -113,9 +114,13 @@ public class InvoiceDAO {
                     + "VALUES (?, ?, ?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
-            // Update inventory only (quantity_std per branch)
+            // Update inventory (quantity_std per branch)
             String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ?";
             psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
+
+            // Update batch total quantity (global across all branches)
+            psUpdateBatch = conn.prepareStatement(
+                    "UPDATE batches SET current_total_quantity = current_total_quantity - ? WHERE batch_id = ?");
 
             for (JsonElement detailElement : details) {
                 JsonObject detail = detailElement.getAsJsonObject();
@@ -140,10 +145,16 @@ public class InvoiceDAO {
                 psUpdateInventory.setInt(2, batchId);
                 psUpdateInventory.setInt(3, branchId);
                 psUpdateInventory.addBatch();
+
+                // Update batch total quantity (deduct from global batch stock)
+                psUpdateBatch.setInt(1, totalStdQuantity);
+                psUpdateBatch.setInt(2, batchId);
+                psUpdateBatch.addBatch();
             }
 
             psDetail.executeBatch();
             psUpdateInventory.executeBatch();
+            psUpdateBatch.executeBatch();
 
             conn.commit(); // Commit transaction
 
@@ -169,6 +180,8 @@ public class InvoiceDAO {
                 psDetail.close();
             if (psUpdateInventory != null)
                 psUpdateInventory.close();
+            if (psUpdateBatch != null)
+                psUpdateBatch.close();
             if (conn != null) {
                 conn.setAutoCommit(true);
                 conn.close();
@@ -179,7 +192,8 @@ public class InvoiceDAO {
     /**
      * Get all invoices with optional filters
      */
-    public List<Invoice> getInvoices(String dateFrom, String dateTo, Integer pharmacistId, Integer branchId, Boolean isSimulated)
+    public List<Invoice> getInvoices(String dateFrom, String dateTo, Integer pharmacistId, Integer branchId,
+            Boolean isSimulated)
             throws SQLException {
         List<Invoice> invoices = new ArrayList<>();
         StringBuilder sql = new StringBuilder(

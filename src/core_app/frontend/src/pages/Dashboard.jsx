@@ -205,14 +205,15 @@ const Dashboard = () => {
                                 {[
                                     { value: 'today', label: 'Hôm nay' },
                                     { value: 'week', label: '7 ngày' },
-                                    { value: 'month', label: '30 ngày' }
+                                    { value: 'month', label: '30 ngày' },
+                                    { value: 'all', label: 'Tất cả' }
                                 ].map((p) => (
                                     <button
                                         key={p.value}
                                         onClick={() => setPeriod(p.value)}
                                         className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all ${period === p.value
-                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                                : 'bg-[#1a1d1c] text-white/60 border border-white/5 hover:border-white/20'
+                                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                            : 'bg-[#1a1d1c] text-white/60 border border-white/5 hover:border-white/20'
                                             }`}
                                     >
                                         {p.label}
