@@ -23,7 +23,9 @@ public class MedicineServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         this.medicineDAO = new MedicineDAO();
-        this.gson = new Gson();
+        this.gson = new com.google.gson.GsonBuilder()
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                .create();
     }
 
     @Override

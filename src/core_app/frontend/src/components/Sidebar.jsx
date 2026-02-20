@@ -6,8 +6,7 @@ import {
     Package,
     Bell,
     Pill,
-    LogOut,
-    User
+    LogOut
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -43,7 +42,7 @@ const Sidebar = () => {
                     <div>
                         <h2 className="text-white font-extrabold text-xl tracking-tight leading-none italic">Pharma<span className="text-[#00ff80]">POS</span></h2>
                         <p className="text-[10px] text-emerald-500/50 uppercase tracking-widest font-bold mt-1">
-                            Dược sĩ: {user?.fullName?.split(' ').pop() || 'Admin'}
+                            Dược sĩ: {user?.role === 'ADMIN' ? 'Admin' : 'Staff'}
                         </p>
                     </div>
                 </div>
@@ -78,12 +77,9 @@ const Sidebar = () => {
 
             <div className="mt-auto p-4 m-4 bg-white/5 rounded-2xl border border-white/5 group transition-colors">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-[#00ff80] border-2 border-emerald-500/20">
-                        <User size={20} strokeWidth={2.5} />
-                    </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate uppercase">{user?.fullName || user?.full_name || 'CHƯA ĐĂNG NHẬP'}</p>
-                        <p className="text-[10px] text-emerald-500/60 uppercase tracking-wider font-bold truncate">
+                        <p className="text-sm font-bold text-white truncate">{user?.fullName || user?.full_name || 'CHƯA ĐĂNG NHẬP'}</p>
+                        <p className="text-xs text-emerald-500/60 font-medium truncate">
                             {user?.branchName || user?.branch_name || 'Quầy số 01'}
                         </p>
                     </div>

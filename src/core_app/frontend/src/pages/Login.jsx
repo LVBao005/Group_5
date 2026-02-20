@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Eye, EyeOff, LogIn, Pill, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { authService } from '../services/authService';
@@ -128,9 +128,9 @@ const Login = () => {
                                 <span className="text-emerald-500/70 group-hover:text-emerald-500 transition-colors">Ghi nhớ đăng nhập</span>
                             </label>
 
-                            <a href="#" className="text-sm text-emerald-500/70 hover:text-emerald-400 font-medium transition-colors">
-                                Quên mật khẩu?
-                            </a>
+                            <Link to="/register" className="text-sm text-emerald-500/70 hover:text-emerald-400 font-medium transition-colors">
+                                Đăng ký tài khoản
+                            </Link>
                         </div>
 
                         <Button

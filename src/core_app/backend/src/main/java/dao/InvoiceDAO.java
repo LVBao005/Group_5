@@ -38,7 +38,6 @@ public class InvoiceDAO {
         PreparedStatement psInvoice = null;
         PreparedStatement psDetail = null;
         PreparedStatement psUpdateInventory = null;
-        PreparedStatement psUpdateBatch = null;
         ResultSet rs = null;
 
         try {
@@ -114,13 +113,13 @@ public class InvoiceDAO {
                     + "VALUES (?, ?, ?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
-            // Update inventory (quantity_std per branch)
-            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ?";
-            psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
+            // Check stock availability and prepare statements
+            String sqlCheckInventory = "SELECT quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ?";
+            PreparedStatement psCheckInventory = conn.prepareStatement(sqlCheckInventory);
 
-            // Update batch total quantity (global across all branches)
-            psUpdateBatch = conn.prepareStatement(
-                    "UPDATE batches SET current_total_quantity = current_total_quantity - ? WHERE batch_id = ?");
+            // Update inventory (quantity_std per branch) - CHỈ cập nhật inventory tại chi nhánh
+            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ? AND quantity_std >= ?";
+            psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
 
             for (JsonElement detailElement : details) {
                 JsonObject detail = detailElement.getAsJsonObject();
@@ -130,6 +129,22 @@ public class InvoiceDAO {
                 int quantitySold = detail.get("quantity_sold").getAsInt();
                 double unitPrice = detail.get("unit_price").getAsDouble();
                 int totalStdQuantity = detail.get("total_std_quantity").getAsInt();
+
+                // Check stock availability at branch
+                psCheckInventory.setInt(1, batchId);
+                psCheckInventory.setInt(2, branchId);
+                ResultSet rsStock = psCheckInventory.executeQuery();
+                
+                int availableStock = 0;
+                if (rsStock.next()) {
+                    availableStock = rsStock.getInt("quantity_std");
+                }
+                rsStock.close();
+                
+                if (availableStock < totalStdQuantity) {
+                    throw new SQLException("Không đủ số lượng tồn kho. Batch ID: " + batchId + 
+                                         ", Cần: " + totalStdQuantity + ", Còn lại: " + availableStock);
+                }
 
                 // Insert detail
                 psDetail.setInt(1, invoiceId);
@@ -144,17 +159,22 @@ public class InvoiceDAO {
                 psUpdateInventory.setInt(1, totalStdQuantity);
                 psUpdateInventory.setInt(2, batchId);
                 psUpdateInventory.setInt(3, branchId);
+                psUpdateInventory.setInt(4, totalStdQuantity); // Safety check
                 psUpdateInventory.addBatch();
-
-                // Update batch total quantity (deduct from global batch stock)
-                psUpdateBatch.setInt(1, totalStdQuantity);
-                psUpdateBatch.setInt(2, batchId);
-                psUpdateBatch.addBatch();
             }
 
             psDetail.executeBatch();
-            psUpdateInventory.executeBatch();
-            psUpdateBatch.executeBatch();
+            
+            int[] inventoryResults = psUpdateInventory.executeBatch();
+            
+            // Verify all inventory updates succeeded
+            for (int i = 0; i < inventoryResults.length; i++) {
+                if (inventoryResults[i] == 0) {
+                    throw new SQLException("Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này.");
+                }
+            }
+            
+            psCheckInventory.close();
 
             conn.commit(); // Commit transaction
 
@@ -180,8 +200,6 @@ public class InvoiceDAO {
                 psDetail.close();
             if (psUpdateInventory != null)
                 psUpdateInventory.close();
-            if (psUpdateBatch != null)
-                psUpdateBatch.close();
             if (conn != null) {
                 conn.setAutoCommit(true);
                 conn.close();

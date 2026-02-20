@@ -8,6 +8,7 @@ import axios from 'axios';
 const axiosInstance = axios.create({
     baseURL: '/api',
     timeout: 10000,
+    withCredentials: true, // Gửi cookies và session
     headers: {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json; charset=UTF-8',

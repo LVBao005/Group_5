@@ -176,7 +176,8 @@ const Invoices = () => {
                                     type="date"
                                     value={dateFrom}
                                     onChange={(e) => setDateFrom(e.target.value)}
-                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00ff80]/20"
+                                    lang="vi-VN"
+                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00ff80]/20 [color-scheme:dark]"
                                 />
                             </div>
                             <div>
@@ -185,7 +186,8 @@ const Invoices = () => {
                                     type="date"
                                     value={dateTo}
                                     onChange={(e) => setDateTo(e.target.value)}
-                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00ff80]/20"
+                                    lang="vi-VN"
+                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00ff80]/20 [color-scheme:dark]"
                                 />
                             </div>
                             <div>

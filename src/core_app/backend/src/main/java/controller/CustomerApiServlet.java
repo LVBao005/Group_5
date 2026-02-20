@@ -22,7 +22,9 @@ public class CustomerApiServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         this.customerService = new CustomerService();
-        this.gson = new Gson();
+        this.gson = new com.google.gson.GsonBuilder()
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                .create();
     }
 
     @Override

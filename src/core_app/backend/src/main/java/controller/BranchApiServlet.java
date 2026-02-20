@@ -1,7 +1,8 @@
 package controller;
 
 import com.google.gson.Gson;
-import service.PharmacyService;
+import dao.BranchDAO;
+import model.Branch;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -15,13 +16,15 @@ import java.util.Map;
 @WebServlet(name = "BranchApiServlet", urlPatterns = { "/api/branches" })
 public class BranchApiServlet extends HttpServlet {
 
-    private PharmacyService pharmacyService;
+    private BranchDAO branchDAO;
     private Gson gson;
 
     @Override
     public void init() throws ServletException {
-        this.pharmacyService = new PharmacyService();
-        this.gson = new Gson();
+        this.branchDAO = new BranchDAO();
+        this.gson = new com.google.gson.GsonBuilder()
+                .setFieldNamingPolicy(com.google.gson.FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                .create();
     }
 
     @Override
@@ -33,9 +36,8 @@ public class BranchApiServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         try {
-            // Use statistics version to satisfy requirements for comparative reports
-            List<Map<String, Object>> stats = pharmacyService.getBranchStatistics();
-            out.print(gson.toJson(stats));
+            List<Branch> branches = branchDAO.getAllBranches();
+            out.print(gson.toJson(branches));
         } catch (Exception e) {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

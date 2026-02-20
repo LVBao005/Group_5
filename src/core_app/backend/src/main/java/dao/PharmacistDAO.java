@@ -92,6 +92,39 @@ public class PharmacistDAO {
         return null;
     }
 
+    /**
+     * Get user by username (without join - for checking existence)
+     */
+    public Pharmacist getUserByUsername(String username) throws SQLException {
+        String sql = "SELECT * FROM pharmacists WHERE username = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return extractPharmacist(rs, false);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Create a new pharmacist
+     */
+    public boolean createPharmacist(Pharmacist pharmacist) throws SQLException {
+        String sql = "INSERT INTO pharmacists (branch_id, username, password, full_name, role) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, pharmacist.getBranchId());
+            ps.setString(2, pharmacist.getUsername());
+            ps.setString(3, pharmacist.getPassword());
+            ps.setString(4, pharmacist.getFullName());
+            ps.setString(5, pharmacist.getRole());
+            
+            int rows = ps.executeUpdate();
+            return rows > 0;
+        }
+    }
+
     private Pharmacist extractPharmacist(ResultSet rs, boolean includeJoined) throws SQLException {
         Pharmacist p = new Pharmacist();
         p.setPharmacistId(rs.getInt("pharmacist_id"));

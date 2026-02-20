@@ -22,10 +22,12 @@ import {
     Trash2
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { inventoryService } from '../services/inventoryService';
 
 const Inventory = () => {
+    const navigate = useNavigate();
     const [medicines, setMedicines] = useState([]); // Master data
     const [batches, setBatches] = useState([]); // Batch tracking data
     const [activeTab, setActiveTab] = useState('batches'); // 'master' or 'batches'
@@ -33,6 +35,8 @@ const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const [importProgress, setImportProgress] = useState(null);
+    const [selectedMedicineDetail, setSelectedMedicineDetail] = useState(null);
+    const [showBatchModal, setShowBatchModal] = useState(false);
 
     // Get user branch
     const userStr = localStorage.getItem('user');
@@ -198,6 +202,16 @@ const Inventory = () => {
         totalValue: batches.reduce((sum, b) => sum + (b.quantityStd * b.importPrice), 0)
     };
 
+    // Handle view medicine batches
+    const handleViewMedicineBatches = (medicine) => {
+        setSelectedMedicineDetail(medicine);
+        setShowBatchModal(true);
+    };
+
+    const getMedicineBatches = (medicineId) => {
+        return batches.filter(b => b.medicine_id === medicineId);
+    };
+
     return (
         <div className="flex h-screen bg-[#0d0f0e] text-slate-200 overflow-hidden font-sans">
             <Sidebar />
@@ -219,18 +233,10 @@ const Inventory = () => {
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
-                        <label className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(59,130,246,0.2)] active:scale-95 cursor-pointer">
-                            <Upload size={16} strokeWidth={3} />
-                            Import CSV
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                                disabled={loading}
-                            />
-                        </label>
-                        <button className="bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95">
+                        <button 
+                            onClick={() => navigate('/import-stock')}
+                            className="bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] font-black uppercase tracking-widest text-[10px] px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
+                        >
                             <Plus size={16} strokeWidth={3} /> Nhập kho
                         </button>
                         <div className="w-px h-8 bg-white/5" />
@@ -578,7 +584,11 @@ const Inventory = () => {
                                                         </td>
                                                         <td className="py-6 px-10">
                                                             <div className="flex items-center justify-center gap-2">
-                                                                <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-blue-500/20 text-white/40 hover:text-blue-400 transition-all flex items-center justify-center">
+                                                                <button 
+                                                                    onClick={() => handleViewMedicineBatches(medicine)}
+                                                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-blue-500/20 text-white/40 hover:text-blue-400 transition-all flex items-center justify-center"
+                                                                    title="Xem chi tiết lô hàng"
+                                                                >
                                                                     <Eye size={14} />
                                                                 </button>
                                                                 <button className="w-8 h-8 rounded-lg bg-white/5 hover:bg-[#00ff80]/20 text-white/40 hover:text-[#00ff80] transition-all flex items-center justify-center">
@@ -600,6 +610,177 @@ const Inventory = () => {
                     </div>
                 </div>
             </main>
+
+            {/* Batch Detail Modal */}
+            {showBatchModal && selectedMedicineDetail && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setShowBatchModal(false)}>
+                    <div className="bg-[#161a19] border border-white/10 rounded-[2rem] max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-[#00ff80]/10 rounded-2xl flex items-center justify-center">
+                                    <Pill size={28} className="text-[#00ff80]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-white mb-1">{selectedMedicineDetail.medicineName}</h2>
+                                    <p className="text-sm text-white/60">{selectedMedicineDetail.activeIngredient}</p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                                            {selectedMedicineDetail.categoryName}
+                                        </span>
+                                        <span className="text-xs font-bold text-white/40">
+                                            {selectedMedicineDetail.brand}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowBatchModal(false)}
+                                className="w-10 h-10 rounded-xl bg-white/5 hover:bg-rose-500/20 text-white/40 hover:text-rose-400 transition-all flex items-center justify-center"
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-8 overflow-auto max-h-[calc(90vh-180px)]">
+                            <div className="grid grid-cols-4 gap-4 mb-8">
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Tổng tồn kho</p>
+                                    <p className="text-2xl font-black text-[#00ff80]">
+                                        {Math.floor(selectedMedicineDetail.totalStock / (selectedMedicineDetail.conversionRate || 1))} {selectedMedicineDetail.baseUnit}
+                                    </p>
+                                    {selectedMedicineDetail.totalStock % (selectedMedicineDetail.conversionRate || 1) > 0 && (
+                                        <p className="text-xs text-white/40 mt-1">
+                                            + {selectedMedicineDetail.totalStock % (selectedMedicineDetail.conversionRate || 1)} {selectedMedicineDetail.subUnit}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Số lô hàng</p>
+                                    <p className="text-2xl font-black text-white">{selectedMedicineDetail.batchCount}</p>
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Giá bán lẻ</p>
+                                    <p className="text-2xl font-black text-white">{selectedMedicineDetail.retailPrice.toLocaleString()}đ</p>
+                                </div>
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Đơn vị quy đổi</p>
+                                    <p className="text-sm font-bold text-white">1 {selectedMedicineDetail.baseUnit}</p>
+                                    <p className="text-xs text-white/40">= {selectedMedicineDetail.conversionRate} {selectedMedicineDetail.subUnit}</p>
+                                </div>
+                            </div>
+
+                            <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Package size={16} className="text-[#00ff80]" />
+                                Danh sách các lô hàng ({getMedicineBatches(selectedMedicineDetail.medicine_id).length} lô)
+                            </h3>
+
+                            <div className="bg-[#0d0f0e] rounded-2xl overflow-hidden border border-white/5">
+                                <table className="w-full">
+                                    <thead className="bg-white/5">
+                                        <tr className="text-[10px] font-black text-white/40 uppercase tracking-wider">
+                                            <th className="py-4 px-6 text-left">Số lô</th>
+                                            <th className="py-4 px-4 text-center">Ngày nhập</th>
+                                            <th className="py-4 px-4 text-center">Hạn sử dụng</th>
+                                            <th className="py-4 px-4 text-right">Giá nhập</th>
+                                            <th className="py-4 px-4 text-center">Tồn kho</th>
+                                            <th className="py-4 px-6 text-center">Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {getMedicineBatches(selectedMedicineDetail.medicine_id).length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" className="py-10 text-center text-white/40">
+                                                    Không có lô hàng nào
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            getMedicineBatches(selectedMedicineDetail.medicine_id).map((batch) => {
+                                                const boxQty = Math.floor(batch.quantityStd / (selectedMedicineDetail.conversionRate || 1));
+                                                const subQty = batch.quantityStd % (selectedMedicineDetail.conversionRate || 1);
+
+                                                return (
+                                                    <tr key={batch.batch_id} className="hover:bg-white/5 transition-colors">
+                                                        <td className="py-4 px-6">
+                                                            <span className="text-sm font-bold text-[#00ff80]">{batch.batchNumber}</span>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <Calendar size={12} className="text-white/20" />
+                                                                <span className="text-xs text-white/60">
+                                                                    {batch.importDate ? new Date(batch.importDate).toLocaleDateString('vi-VN') : 'N/A'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <Clock size={12} className={cn(
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
+                                                                        batch.status === 'warning' ? 'text-amber-500' : 'text-white/20'
+                                                                )} />
+                                                                <span className={cn(
+                                                                    "text-xs font-bold",
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
+                                                                        batch.status === 'warning' ? 'text-amber-500' : 'text-white/60'
+                                                                )}>
+                                                                    {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('vi-VN') : 'N/A'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-right">
+                                                            <p className="text-sm font-bold text-white">
+                                                                {batch.importPrice.toLocaleString()}đ
+                                                            </p>
+                                                            <p className="text-[10px] text-white/20">/{selectedMedicineDetail.baseUnit}</p>
+                                                        </td>
+                                                        <td className="py-4 px-4">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="text-lg font-black text-white">
+                                                                        {boxQty}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-bold text-white/40 uppercase">
+                                                                        {selectedMedicineDetail.baseUnit}
+                                                                    </span>
+                                                                </div>
+                                                                {subQty > 0 && (
+                                                                    <div className="flex items-baseline gap-1.5 opacity-60">
+                                                                        <Plus size={8} className="text-white" />
+                                                                        <span className="text-xs font-bold text-white">{subQty}</span>
+                                                                        <span className="text-[9px] font-bold text-white/50 uppercase">
+                                                                            {selectedMedicineDetail.subUnit}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center">
+                                                            <div className={cn(
+                                                                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase",
+                                                                batch.status === 'expired' || batch.status === 'critical' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                                                                    batch.status === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
+                                                                        'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                                                            )}>
+                                                                <div className={cn(
+                                                                    "w-1.5 h-1.5 rounded-full",
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'bg-rose-500 animate-pulse' :
+                                                                        batch.status === 'warning' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                                                                )} />
+                                                                {getStatusLabel(batch.status)}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
