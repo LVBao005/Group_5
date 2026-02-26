@@ -1,5 +1,0 @@
-{
-  "name": "Pharmacy Data Engine Pro",
-  "description": "A high-performance data generation suite for Vietnamese pharmacy management systems, creating thousands of realistic records including medicine unit conversions, VNĐ pricing logic, and inventory batches.",
-  "requestFramePermissions": []
-}

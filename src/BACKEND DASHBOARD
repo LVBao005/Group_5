@@ -1,7 +1,0 @@
-nguồn/
-└── backend/
-    └── src/
-        └── main/
-            └── java/
-                └── controller/
-                    └── DashboardController.java
