@@ -1,0 +1,21 @@
+nguồn/
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       └── pages/
+│           └── dashboard/
+│               ├── Dashboard.jsx
+│               ├── components/
+│               │   ├── StatCards.jsx
+│               │   ├── RevenueLineChart.jsx
+│               │   ├── RevenuePieChart.jsx
+│               │   └── AlertsPanel.jsx
+│               └── dashboardService.js
+│
+└── backend/
+    └── src/
+        └── main/
+            └── java/
+                └── controller/
+                    └── DashboardController.java

@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 154 44% 4%;
+        /* #060d0a */
+        --foreground: 154 10% 98%;
+        --card: 154 44% 6%;
+        --card-foreground: 154 10% 98%;
+        --popover: 154 44% 5%;
+        --popover-foreground: 154 10% 98%;
+        --primary: 150 100% 50%;
+        /* Neon Green #00ff80 */
+        --primary-foreground: 154 44% 4%;
+        --secondary: 154 20% 15%;
+        --secondary-foreground: 154 10% 98%;
+        --muted: 154 20% 12%;
+        --muted-foreground: 154 10% 60%;
+        --accent: 150 100% 50%;
+        --accent-foreground: 154 10% 98%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 154 20% 15%;
+        --input: 154 20% 12%;
+        --ring: 150 100% 50%;
+        --radius: 1rem;
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+}
+
+@layer utilities {
+    .neon-shadow {
+        box-shadow: 0 0 15px rgba(0, 255, 128, 0.4);
+    }
+
+    .neon-text-shadow {
+        text-shadow: 0 0 8px rgba(0, 255, 128, 0.6);
+    }
+
+    .bg-glass {
+        background: rgba(10, 25, 18, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 255, 128, 0.1);
+    }
+
+    /* Custom scrollbar styles */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(16, 185, 129, 0.3);
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(16, 185, 129, 0.5);
+    }
+
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+    }
+}
