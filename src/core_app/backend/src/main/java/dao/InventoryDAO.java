@@ -146,4 +146,98 @@ public class InventoryDAO {
             throw e;
         }
     }
+
+    public List<Inventory> getAvailableCentralBatches() throws SQLException {
+        List<Inventory> results = new ArrayList<>();
+        String sql = "SELECT b.batch_id, b.medicine_id, b.batch_number, b.expiry_date, b.import_price_package, b.current_total_quantity, "
+                +
+                "m.name as medicine_name, m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, "
+                +
+                "m.category_id, c.category_name, m.brand " +
+                "FROM batches b " +
+                "JOIN medicines m ON b.medicine_id = m.medicine_id " +
+                "JOIN categories c ON m.category_id = c.category_id " +
+                "WHERE b.current_total_quantity > 0 " +
+                "ORDER BY b.expiry_date ASC";
+
+        try (PreparedStatement ps = connection.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Inventory inv = new Inventory();
+                // Map current_total_quantity from batches to quantityStd in Inventory for
+                // frontend convenience
+                inv.setQuantityStd(rs.getInt("current_total_quantity"));
+                inv.setBatchId(rs.getInt("batch_id"));
+                inv.setMedicineId(rs.getInt("medicine_id"));
+                inv.setBatchNumber(rs.getString("batch_number"));
+                inv.setExpiryDate(rs.getDate("expiry_date"));
+                inv.setImportPrice(rs.getDouble("import_price_package"));
+
+                inv.setMedicineName(rs.getString("medicine_name"));
+                inv.setBaseUnit(rs.getString("base_unit"));
+                inv.setSubUnit(rs.getString("sub_unit"));
+                inv.setConversionRate(rs.getInt("conversion_rate"));
+                inv.setBaseSellPrice(rs.getDouble("base_sell_price"));
+                inv.setSubSellPrice(rs.getDouble("sub_sell_price"));
+                inv.setCategoryId(rs.getInt("category_id"));
+                inv.setCategoryName(rs.getString("category_name"));
+                inv.setBrand(rs.getString("brand"));
+
+                inv.calculateUnits();
+                // Set these to 0 as they don't apply to central unallocated batches view
+                inv.setInventoryId(0);
+                inv.setBranchId(0);
+                results.add(inv);
+            }
+        }
+        return results;
+    }
+
+    public void importStockToBranch(int branchId, int batchId, int quantityToImport) throws SQLException {
+        try {
+            // 1. Check if batch has enough quantity and lock row
+            String checkBatchSql = "SELECT current_total_quantity FROM batches WHERE batch_id = ? FOR UPDATE";
+            try (PreparedStatement psCheck = connection.prepareStatement(checkBatchSql)) {
+                psCheck.setInt(1, batchId);
+                try (ResultSet rs = psCheck.executeQuery()) {
+                    if (rs.next()) {
+                        int currentQty = rs.getInt("current_total_quantity");
+                        if (currentQty < quantityToImport) {
+                            throw new SQLException("Not enough quantity in central batch");
+                        }
+                    } else {
+                        throw new SQLException("Batch not found");
+                    }
+                }
+            }
+
+            // 2. Reduce quantity from batches table
+            String updateBatchSql = "UPDATE batches SET current_total_quantity = current_total_quantity - ? WHERE batch_id = ?";
+            try (PreparedStatement psUpdate = connection.prepareStatement(updateBatchSql)) {
+                psUpdate.setInt(1, quantityToImport);
+                psUpdate.setInt(2, batchId);
+                psUpdate.executeUpdate();
+            }
+
+            // 3. Upsert into inventory table (insert or update)
+            // Note: MySQL requires UNIQUE constraint on branch_id + batch_id for ON
+            // DUPLICATE KEY UPDATE to work.
+            // Our schema has: UNIQUE KEY `uk_branch_batch` (`branch_id`, `batch_id`)
+            String upsertInventorySql = "INSERT INTO inventory (branch_id, batch_id, quantity_std) VALUES (?, ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE quantity_std = quantity_std + ?, last_updated = CURRENT_TIMESTAMP";
+
+            try (PreparedStatement psUpsert = connection.prepareStatement(upsertInventorySql)) {
+                psUpsert.setInt(1, branchId);
+                psUpsert.setInt(2, batchId);
+                psUpsert.setInt(3, quantityToImport);
+                psUpsert.setInt(4, quantityToImport); // value for ON DUPLICATE update
+                psUpsert.executeUpdate();
+            }
+
+            connection.commit();
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        }
+    }
 }

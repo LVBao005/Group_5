@@ -20,7 +20,16 @@ export default defineConfig({
             '/api': {
                 target: 'http://localhost:8080/backend',
                 changeOrigin: true,
-
+                configure: (proxy, _options) => {
+                    proxy.on('proxyRes', (proxyRes, req, res) => {
+                        const setCookie = proxyRes.headers['set-cookie'];
+                        if (setCookie) {
+                            proxyRes.headers['set-cookie'] = setCookie.map(cookie =>
+                                cookie.replace(/Path=\/backend/i, 'Path=/')
+                            );
+                        }
+                    });
+                }
             },
         },
         watch: {

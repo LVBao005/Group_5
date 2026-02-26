@@ -42,6 +42,13 @@ public class InventoryServlet extends HttpServlet {
         // Allowing access to inventory for both POS and Inventory management
 
         try {
+            String action = request.getParameter("action");
+            if ("centralBatches".equals(action)) {
+                List<Inventory> centralBatches = inventoryDAO.getAvailableCentralBatches();
+                out.print(gson.toJson(Map.of("success", true, "data", centralBatches)));
+                return;
+            }
+
             String branchIdStr = request.getParameter("branchId");
             int branchId = 1; // Default to branch 1 if not specified
 
@@ -67,5 +74,53 @@ public class InventoryServlet extends HttpServlet {
         }
     }
 
-    // Allow for future expansion (POST for import, etc.)
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        PrintWriter out = response.getWriter();
+
+        try {
+            String action = request.getParameter("action");
+            if ("import".equals(action)) {
+                // Parse JSON from request body
+                StringBuilder sb = new StringBuilder();
+                String line;
+                try (java.io.BufferedReader reader = request.getReader()) {
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+
+                // We use a simple Map to extract values since we just need 3 ints
+                java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, Object>>() {
+                }.getType();
+                Map<String, Object> payload = gson.fromJson(sb.toString(), type);
+
+                if (payload == null || !payload.containsKey("branchId") || !payload.containsKey("batchId")
+                        || !payload.containsKey("quantity")) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    out.print(gson.toJson(
+                            Map.of("success", false, "error", "Missing required fields: branchId, batchId, quantity")));
+                    return;
+                }
+
+                int branchId = ((Number) payload.get("branchId")).intValue();
+                int batchId = ((Number) payload.get("batchId")).intValue();
+                int quantity = ((Number) payload.get("quantity")).intValue();
+
+                inventoryDAO.importStockToBranch(branchId, batchId, quantity);
+
+                out.print(gson.toJson(Map.of("success", true, "message", "Stock imported successfully")));
+            } else {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print(gson.toJson(Map.of("success", false, "error", "Invalid or missing action parameter")));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print(gson.toJson(Map.of("success", false, "error", e.getMessage())));
+        }
+    }
 }

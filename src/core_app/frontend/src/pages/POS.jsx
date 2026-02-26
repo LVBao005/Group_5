@@ -41,7 +41,6 @@ const POS = () => {
     const [phone, setPhone] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
     // Get current user and branch for the invoice
     const userStr = localStorage.getItem('user');
@@ -150,17 +149,13 @@ const POS = () => {
     }, []);
 
     // Filter logic
-    const filteredMedicines = activeCategory === 0
-        ? medicines
-        : medicines.filter(m => m.category_id === activeCategory);
-
-    // Search results for autocomplete (Limit 5)
-    const searchResults = searchTerm.trim() === ''
-        ? []
-        : medicines.filter(m =>
+    const filteredMedicines = medicines.filter(m => {
+        const matchesCategory = activeCategory === 0 || m.category_id === activeCategory;
+        const matchesSearch = searchTerm.trim() === '' ||
             (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (m.brand || '').toLowerCase().includes(searchTerm.toLowerCase())
-        ).slice(0, 5);
+            (m.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesCategory && matchesSearch;
+    });
 
     // Pagination Logic (Only for "All" category)
     const displayMedicines = activeCategory === 0
@@ -414,49 +409,10 @@ const POS = () => {
                             type="text"
                             placeholder="Tìm tên thuốc, thương hiệu..."
                             value={searchTerm}
-                            onChange={(e) => {
-                                setSearchTerm(e.target.value);
-                                setShowSearchDropdown(true);
-                            }}
-                            onFocus={() => setShowSearchDropdown(true)}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-[#1a1d1c] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#00ff80]/20 transition-all text-white"
                         />
 
-                        {/* Autocomplete Dropdown */}
-                        {showSearchDropdown && searchResults.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1d1c] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
-                                {searchResults.map((medicine) => (
-                                    <button
-                                        key={`search-${medicine.medicine_id}`}
-                                        onClick={() => {
-                                            addToCart(medicine);
-                                            setSearchTerm('');
-                                            setShowSearchDropdown(false);
-                                        }}
-                                        className="w-full flex items-center gap-4 px-6 py-4 hover:bg-[#00ff80]/5 transition-colors border-b border-white/5 last:border-0 text-left group/item"
-                                    >
-                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover/item:text-[#00ff80] transition-colors">
-                                            <Pill size={20} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-bold text-white truncate">{medicine.name}</p>
-                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">{medicine.brand || 'No Brand'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-black text-[#00ff80]">{formatPrice(medicine.base_sell_price)}đ</p>
-                                            <p className="text-[10px] text-white/20 font-bold uppercase">Còn: {medicine.total_stock} {medicine.base_unit}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Close dropdown on click outside logic is usually handling with a global listener or a transparent overlay, 
-                            but for this implementation Plan we'll keep it simple or add a backdrop if needed. 
-                            Let's add a simple overlay to handle clicks outside. */}
-                        {showSearchDropdown && searchTerm.length > 0 && (
-                            <div className="fixed inset-0 z-[55]" onClick={() => setShowSearchDropdown(false)} />
-                        )}
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
