@@ -1,5 +1,6 @@
 # --- JAVA / MAVEN / GRADLE ---
 *.class
+.class
 *.log
 *.jar
 *.war
