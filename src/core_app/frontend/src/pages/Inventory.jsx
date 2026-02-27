@@ -39,6 +39,7 @@ const Inventory = () => {
     const [importProgress, setImportProgress] = useState(null);
     const [selectedMedicineDetail, setSelectedMedicineDetail] = useState(null);
     const [showBatchModal, setShowBatchModal] = useState(false);
+    const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
     // Import Stock specific state
     const [showImportModal, setShowImportModal] = useState(false);
@@ -85,6 +86,7 @@ const Inventory = () => {
                         conversionRate: item.conversion_rate,
                         retailPrice: item.base_sell_price || 0,
                         brand: item.brand || 'Generic',
+                        minStockLevel: item.min_stock_level || 0,
                         totalStock: 0,
                         batchCount: 0
                     });
@@ -126,11 +128,19 @@ const Inventory = () => {
             setBatches(batchList);
 
             // Format central dataset adding statuses just in case they're displayed
-            const centralBatchesFormatted = centralData.map(item => ({
-                ...item,
-                status: getExpiryStatus(item.expiryDate)
-            }));
-            setCentralBatches(centralBatchesFormatted);
+                const centralBatchesFormatted = centralData.map(item => {
+                    // Fallback for expiryDate (backend may send expiry_date)
+                    const expiryDate = item.expiryDate || item.expiry_date || null;
+                    // Fallback for quantityStd (backend may send quantity_std or current_total_quantity)
+                    const quantityStd = item.quantityStd ?? item.quantity_std ?? item.current_total_quantity ?? 0;
+                    return {
+                        ...item,
+                        expiryDate,
+                        quantityStd,
+                        status: getExpiryStatus(expiryDate)
+                    };
+                });
+                setCentralBatches(centralBatchesFormatted);
         } catch (error) {
             console.error("Failed to load inventory", error);
         } finally {
@@ -260,7 +270,8 @@ const Inventory = () => {
         const matchesSearch = item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.activeIngredient?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = activeCategory === 'all' || item.categoryName === activeCategory;
-        return matchesSearch && matchesCategory;
+        const matchesLowStock = !showLowStockOnly || item.totalStock <= item.minStockLevel;
+        return matchesSearch && matchesCategory && matchesLowStock;
     });
 
     const filteredBatches = batches.filter(item => {
@@ -394,8 +405,16 @@ const Inventory = () => {
                                 <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
                                     {filteredMedicines.length} Danh mục thuốc
                                 </span>
-                                <button className="flex items-center gap-2 text-[10px] font-black text-white/20 uppercase tracking-widest hover:text-white transition-colors">
-                                    <Filter size={14} /> Lọc
+                                <button 
+                                    onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                                    className={cn(
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all px-4 py-2 rounded-full border",
+                                        showLowStockOnly 
+                                            ? "bg-rose-500/20 border-rose-500/40 text-rose-400 hover:bg-rose-500/30" 
+                                            : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20"
+                                    )}
+                                >
+                                    <AlertTriangle size={14} /> Thuốc sắp hết
                                 </button>
                             </div>
                         </div>
@@ -734,7 +753,18 @@ const Inventory = () => {
                         </div>
 
                         <div className="p-8 overflow-auto max-h-[calc(90vh-180px)]">
-                            <div className="grid grid-cols-2 gap-4 mb-8">
+                            <div className="grid grid-cols-3 gap-4 mb-8">
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Tồn kho chi nhánh</p>
+                                    <p className="text-2xl font-black text-white">
+                                        {Math.floor(selectedMedicineDetail.totalStock / (selectedMedicineDetail.conversionRate || 1))} {selectedMedicineDetail.baseUnit}
+                                    </p>
+                                    {selectedMedicineDetail.totalStock % (selectedMedicineDetail.conversionRate || 1) > 0 && (
+                                        <p className="text-xs text-white/40 mt-1">
+                                            + {selectedMedicineDetail.totalStock % (selectedMedicineDetail.conversionRate || 1)} {selectedMedicineDetail.subUnit}
+                                        </p>
+                                    )}
+                                </div>
                                 <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                                     <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Tồn kho tổng có sẵn</p>
                                     <p className="text-2xl font-black text-[#00ff80]">
@@ -747,9 +777,99 @@ const Inventory = () => {
                                     )}
                                 </div>
                                 <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Số lô tại kho tổng</p>
-                                    <p className="text-2xl font-black text-white">{selectedMedicineDetail.centralBatchCount}</p>
+                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Ngưỡng cảnh báo</p>
+                                    <p className={cn(
+                                        "text-2xl font-black",
+                                        selectedMedicineDetail.totalStock <= selectedMedicineDetail.minStockLevel 
+                                            ? "text-rose-500" 
+                                            : "text-white"
+                                    )}>
+                                        {Math.floor(selectedMedicineDetail.minStockLevel / (selectedMedicineDetail.conversionRate || 1))} {selectedMedicineDetail.baseUnit}
+                                    </p>
+                                    {selectedMedicineDetail.minStockLevel % (selectedMedicineDetail.conversionRate || 1) > 0 && (
+                                        <p className="text-xs text-white/40 mt-1">
+                                            + {selectedMedicineDetail.minStockLevel % (selectedMedicineDetail.conversionRate || 1)} {selectedMedicineDetail.subUnit}
+                                        </p>
+                                    )}
                                 </div>
+                            </div>
+
+                            {/* Existing Batches at Branch */}
+                            <div className="mb-8">
+                                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Boxes size={16} className="text-blue-400" />
+                                    Các lô đang có tại chi nhánh ({getMedicineBatches(selectedMedicineDetail.medicine_id).length} lô)
+                                </h3>
+                                
+                                {getMedicineBatches(selectedMedicineDetail.medicine_id).length === 0 ? (
+                                    <div className="p-6 text-center text-white/40 bg-[#0d0f0e] rounded-2xl border border-white/5">
+                                        Chưa có lô hàng nào tại chi nhánh
+                                    </div>
+                                ) : (
+                                    <div className="bg-[#0d0f0e] rounded-2xl overflow-hidden border border-white/5">
+                                        <table className="w-full">
+                                            <thead className="bg-white/5">
+                                                <tr className="text-[10px] font-black text-white/40 uppercase tracking-wider">
+                                                    <th className="py-3 px-4 text-left">Số lô</th>
+                                                    <th className="py-3 px-4 text-center">Hạn sử dụng</th>
+                                                    <th className="py-3 px-4 text-center">Tồn kho</th>
+                                                    <th className="py-3 px-4 text-center">Trạng thái</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5">
+                                                {getMedicineBatches(selectedMedicineDetail.medicine_id).map((batch) => {
+                                                    const boxQty = Math.floor(batch.quantityStd / (selectedMedicineDetail.conversionRate || 1));
+                                                    const subQty = batch.quantityStd % (selectedMedicineDetail.conversionRate || 1);
+
+                                                    return (
+                                                        <tr key={batch.batch_id} className="hover:bg-white/5 transition-colors">
+                                                            <td className="py-3 px-4">
+                                                                <span className="text-sm font-bold text-[#00ff80]">{batch.batchNumber}</span>
+                                                            </td>
+                                                            <td className="py-3 px-4 text-center">
+                                                                <span className={cn(
+                                                                    "text-xs font-bold",
+                                                                    batch.status === 'expired' || batch.status === 'critical' ? 'text-rose-500' :
+                                                                        batch.status === 'warning' ? 'text-amber-500' : 'text-white/60'
+                                                                )}>
+                                                                    {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString('vi-VN') : 'N/A'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-3 px-4">
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="flex items-baseline gap-1.5">
+                                                                        <span className="text-sm font-black text-white">{boxQty}</span>
+                                                                        <span className="text-[9px] font-bold text-white/40 uppercase">{selectedMedicineDetail.baseUnit}</span>
+                                                                    </div>
+                                                                    {subQty > 0 && (
+                                                                        <div className="flex items-baseline gap-1 opacity-60">
+                                                                            <Plus size={6} className="text-white" />
+                                                                            <span className="text-xs font-bold text-white">{subQty}</span>
+                                                                            <span className="text-[8px] font-bold text-white/50 uppercase">{selectedMedicineDetail.subUnit}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 px-4 text-center">
+                                                                <div className={cn(
+                                                                    "inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[9px] font-black uppercase",
+                                                                    getStatusColor(batch.status)
+                                                                )}>
+                                                                    <div className={cn(
+                                                                        "w-1.5 h-1.5 rounded-full",
+                                                                        batch.status === 'expired' || batch.status === 'critical' ? 'bg-rose-500 animate-pulse' :
+                                                                            batch.status === 'warning' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                                                                    )} />
+                                                                    {getStatusLabel(batch.status)}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
 
                             <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -764,8 +884,8 @@ const Inventory = () => {
                                     </div>
                                 ) : (
                                     getCentralBatchesForMedicine(selectedMedicineDetail.medicine_id).map((batch) => {
-                                        const boxQty = Math.floor(batch.quantityStd / (selectedMedicineDetail.conversionRate || 1));
-                                        const subQty = batch.quantityStd % (selectedMedicineDetail.conversionRate || 1);
+                                        const boxQty = Math.floor((batch.quantityStd ?? 0) / (selectedMedicineDetail.conversionRate || 1));
+                                        const subQty = (batch.quantityStd ?? 0) % (selectedMedicineDetail.conversionRate || 1);
                                         const isSelected = selectedCentralBatch?.batch_id === batch.batch_id;
 
                                         return (

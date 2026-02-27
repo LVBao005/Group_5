@@ -23,6 +23,7 @@ public class Inventory {
     private String categoryName;
     private int medicineId;
     private String brand;
+    private int minStockLevel; // Warning threshold from medicine
     private int baseQuantity; // Calculated
     private int subQuantity; // Calculated
     private String displayStock; // Calculated
@@ -181,6 +182,14 @@ public class Inventory {
 
     public void setBrand(String brand) {
         this.brand = brand;
+    }
+
+    public int getMinStockLevel() {
+        return minStockLevel;
+    }
+
+    public void setMinStockLevel(int minStockLevel) {
+        this.minStockLevel = minStockLevel;
     }
 
     public int getBaseQuantity() {

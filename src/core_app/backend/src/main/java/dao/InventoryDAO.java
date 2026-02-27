@@ -24,7 +24,7 @@ public class InventoryDAO {
         List<Inventory> inventoryList = new ArrayList<>();
         String sql = "SELECT i.*, m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
                 "m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, " +
-                "m.category_id, c.category_name, m.medicine_id, m.brand " +
+                "m.category_id, c.category_name, m.medicine_id, m.brand, m.min_stock_level " +
                 "FROM inventory i " +
                 "JOIN batches b ON i.batch_id = b.batch_id " +
                 "JOIN medicines m ON b.medicine_id = m.medicine_id " +
@@ -46,7 +46,7 @@ public class InventoryDAO {
         List<Inventory> results = new ArrayList<>();
         String sql = "SELECT i.*, m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
                 "m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, " +
-                "m.category_id, c.category_name, m.medicine_id, m.brand " +
+                "m.category_id, c.category_name, m.medicine_id, m.brand, m.min_stock_level " +
                 "FROM inventory i " +
                 "JOIN batches b ON i.batch_id = b.batch_id " +
                 "JOIN medicines m ON b.medicine_id = m.medicine_id " +
@@ -95,6 +95,7 @@ public class InventoryDAO {
         inv.setCategoryName(rs.getString("category_name"));
         inv.setMedicineId(rs.getInt("medicine_id"));
         inv.setBrand(rs.getString("brand"));
+        inv.setMinStockLevel(rs.getInt("min_stock_level"));
 
         inv.calculateUnits();
 
