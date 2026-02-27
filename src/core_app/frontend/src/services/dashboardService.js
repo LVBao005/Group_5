@@ -41,9 +41,9 @@ const dashboardService = {
     /**
      * Get revenue breakdown by category
      */
-    getRevenueByCategory: async () => {
+    getRevenueByCategory: async (period = 'all') => {
         try {
-            const response = await axios.get('/dashboard/revenue-by-category');
+            const response = await axios.get(`/dashboard/revenue-by-category?period=${period}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching revenue by category:', error);

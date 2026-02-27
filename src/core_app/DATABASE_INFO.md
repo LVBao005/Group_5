@@ -2,10 +2,10 @@
 
 ## ⚠️ QUAN TRỌNG - DATABASE ĐANG SỬ DỤNG
 
-**File database chính thức:** `Pharmacy_Lab211_Full_Final.sql`
+**File database chính thức:** `Pharmacy_V15_StrictConstraints.Finall.sql`
 
-- Đường dẫn: `CodeGenData/Pharmacy_Lab211_Full_Final.sql`
-- Đây là file database đầy đủ và mới nhất đang được sử dụng cho dự án
+- Đường dẫn: `CodeGenData/Pharmacy_V15_StrictConstraints.Finall.sql`
+- Đây là phiên bản database mới nhất (V15) với các ràng buộc dữ liệu chặt chẽ (Strict Constraints)
 - **KHÔNG SỬ DỤNG** các file SQL khác trong thư mục CodeGenData
 
 ## Các file SQL khác (chỉ tham khảo)

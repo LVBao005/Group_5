@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import POS from './pages/POS';
 import Inventory from './pages/Inventory';
-import ImportStock from './pages/ImportStock';
+
 import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import Login from './pages/Login';
@@ -44,14 +44,7 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-                    <Route
-                        path="/import-stock"
-                        element={
-                            <ProtectedRoute allowedRoles={['ADMIN']}>
-                                <ImportStock />
-                            </ProtectedRoute>
-                        }
-                    />
+
                     <Route
                         path="/dashboard"
                         element={

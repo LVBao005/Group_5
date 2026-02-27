@@ -100,20 +100,7 @@ const POS = () => {
 
                 // Finalize medicines list
                 const medicinesList = Object.values(grouped).map(m => {
-                    // Calculate total stock (sum all batches in BASE units)
-                    // If quantity_std seems to be in sub-units (abnormally high), convert it
-                    m.total_stock = m.batches.reduce((sum, b) => {
-                        let qty = b.quantity_std;
-
-                        // Auto-detect: If quantity seems to be in sub-units (too large), convert to base
-                        // Heuristic: If conversion_rate exists and quantity > 500, likely in sub-units
-                        if (m.conversion_rate && m.conversion_rate > 1 && qty > 500) {
-                            qty = Math.floor(qty / m.conversion_rate);
-                            console.warn(`⚠️ ${m.name}: Auto-converted ${b.quantity_std} → ${qty} ${m.base_unit} (÷${m.conversion_rate})`);
-                        }
-
-                        return sum + qty;
-                    }, 0);
+                    m.total_stock = m.batches.reduce((sum, b) => sum + (b.quantity_std || 0), 0);
 
                     // Sort batches by expiry (FIFO)
                     m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
@@ -465,8 +452,8 @@ const POS = () => {
                             const baseStock = availableStock[medicine.medicine_id] || 0;
                             const conversionRate = medicine.conversion_rate || 1;
                             const displayStock = selectedUnit === 'sub'
-                                ? Math.floor(baseStock * conversionRate)  // Convert to sub-units (e.g., 10 boxes * 100 = 1000 pills)
-                                : baseStock; // Keep as base units
+                                ? baseStock
+                                : Math.floor(baseStock / conversionRate);
 
                             return (
                                 <div key={medicine.medicine_id} className="bg-[#161a19] border border-white/5 rounded-3xl p-6 flex flex-col hover:border-[#00ff80]/30 transition-all group overflow-hidden relative">

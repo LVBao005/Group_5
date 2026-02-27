@@ -21,7 +21,8 @@ import {
     Edit2,
     Trash2,
     ShoppingCart,
-    Boxes
+    Boxes,
+    CheckCircle
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
@@ -44,7 +45,7 @@ const Inventory = () => {
     // Import Stock specific state
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedCentralBatch, setSelectedCentralBatch] = useState(null);
-    const [importQuantity, setImportQuantity] = useState({ boxes: '', units: '' });
+    const [importQuantity, setImportQuantity] = useState({ value: '', unitType: 'base' }); // base or sub
     const [successMessage, setSuccessMessage] = useState('');
 
     // Get user branch
@@ -116,7 +117,10 @@ const Inventory = () => {
             // Add central total available directly onto medicine object for checking
             const medicinesArray = Array.from(masterMap.values()).map(med => {
                 const medCentralBatches = centralData.filter(b => b.medicine_id === med.medicine_id);
-                const totalCentralStock = medCentralBatches.reduce((acc, curr) => acc + (curr.quantityStd || 0), 0);
+                const totalCentralStock = medCentralBatches.reduce((acc, curr) => {
+                    const qty = curr.quantityStd ?? curr.quantity_std ?? curr.current_total_quantity ?? 0;
+                    return acc + qty;
+                }, 0);
                 return {
                     ...med,
                     totalCentralStock,
@@ -128,19 +132,19 @@ const Inventory = () => {
             setBatches(batchList);
 
             // Format central dataset adding statuses just in case they're displayed
-                const centralBatchesFormatted = centralData.map(item => {
-                    // Fallback for expiryDate (backend may send expiry_date)
-                    const expiryDate = item.expiryDate || item.expiry_date || null;
-                    // Fallback for quantityStd (backend may send quantity_std or current_total_quantity)
-                    const quantityStd = item.quantityStd ?? item.quantity_std ?? item.current_total_quantity ?? 0;
-                    return {
-                        ...item,
-                        expiryDate,
-                        quantityStd,
-                        status: getExpiryStatus(expiryDate)
-                    };
-                });
-                setCentralBatches(centralBatchesFormatted);
+            const centralBatchesFormatted = centralData.map(item => {
+                const expiryDate = item.expiryDate || item.expiry_date || null;
+                const quantityStd = item.quantityStd ?? item.quantity_std ?? item.current_total_quantity ?? 0;
+                const batchNumber = item.batchNumber || item.batch_number || 'N/A';
+                return {
+                    ...item,
+                    expiryDate,
+                    quantityStd,
+                    batchNumber,
+                    status: getExpiryStatus(expiryDate)
+                };
+            });
+            setCentralBatches(centralBatchesFormatted);
         } catch (error) {
             console.error("Failed to load inventory", error);
         } finally {
@@ -219,7 +223,7 @@ const Inventory = () => {
     const handleOpenImport = (medicine) => {
         setSelectedMedicineDetail(medicine);
         setSelectedCentralBatch(null);
-        setImportQuantity({ boxes: '', units: '' });
+        setImportQuantity({ value: '', unitType: 'base' });
         setShowImportModal(true);
     };
 
@@ -233,16 +237,17 @@ const Inventory = () => {
             return;
         }
 
-        const boxes = parseInt(importQuantity.boxes) || 0;
-        const units = parseInt(importQuantity.units) || 0;
-        const totalQty = (boxes * (selectedMedicineDetail.conversionRate || 1)) + units;
+        const qty = parseInt(importQuantity.value) || 0;
+        const totalQty = importQuantity.unitType === 'base'
+            ? qty * (selectedMedicineDetail.conversionRate || 1)
+            : qty;
 
         if (totalQty <= 0) {
             alert('Vui lòng nhập số lượng hợp lệ');
             return;
         }
 
-        if (totalQty > selectedCentralBatch.quantityStd) {
+        if (totalQty > (selectedCentralBatch.quantityStd || 0)) {
             alert('Số lượng vượt quá tồn kho tổng của lô này');
             return;
         }
@@ -251,7 +256,10 @@ const Inventory = () => {
             setLoading(true);
             await inventoryService.importStock(branchId, selectedCentralBatch.batch_id, totalQty);
 
-            setSuccessMessage(`Đã nhập ${boxes} ${selectedMedicineDetail.baseUnit} ${units > 0 ? `+ ${units} ${selectedMedicineDetail.subUnit}` : ''} vào kho chi nhánh!`);
+            const displayQty = importQuantity.unitType === 'base'
+                ? `${importQuantity.value} ${selectedMedicineDetail.baseUnit}`
+                : `${importQuantity.value} ${selectedMedicineDetail.subUnit}`;
+            setSuccessMessage(`Đã nhập ${displayQty} vào kho chi nhánh!`);
             setTimeout(() => {
                 setSuccessMessage('');
                 setShowImportModal(false);
@@ -405,12 +413,12 @@ const Inventory = () => {
                                 <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
                                     {filteredMedicines.length} Danh mục thuốc
                                 </span>
-                                <button 
+                                <button
                                     onClick={() => setShowLowStockOnly(!showLowStockOnly)}
                                     className={cn(
                                         "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all px-4 py-2 rounded-full border",
-                                        showLowStockOnly 
-                                            ? "bg-rose-500/20 border-rose-500/40 text-rose-400 hover:bg-rose-500/30" 
+                                        showLowStockOnly
+                                            ? "bg-rose-500/20 border-rose-500/40 text-rose-400 hover:bg-rose-500/30"
                                             : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20"
                                     )}
                                 >
@@ -780,8 +788,8 @@ const Inventory = () => {
                                     <p className="text-[10px] font-black text-white/40 uppercase tracking-wider mb-2">Ngưỡng cảnh báo</p>
                                     <p className={cn(
                                         "text-2xl font-black",
-                                        selectedMedicineDetail.totalStock <= selectedMedicineDetail.minStockLevel 
-                                            ? "text-rose-500" 
+                                        selectedMedicineDetail.totalStock <= selectedMedicineDetail.minStockLevel
+                                            ? "text-rose-500"
                                             : "text-white"
                                     )}>
                                         {Math.floor(selectedMedicineDetail.minStockLevel / (selectedMedicineDetail.conversionRate || 1))} {selectedMedicineDetail.baseUnit}
@@ -800,7 +808,7 @@ const Inventory = () => {
                                     <Boxes size={16} className="text-blue-400" />
                                     Các lô đang có tại chi nhánh ({getMedicineBatches(selectedMedicineDetail.medicine_id).length} lô)
                                 </h3>
-                                
+
                                 {getMedicineBatches(selectedMedicineDetail.medicine_id).length === 0 ? (
                                     <div className="p-6 text-center text-white/40 bg-[#0d0f0e] rounded-2xl border border-white/5">
                                         Chưa có lô hàng nào tại chi nhánh
@@ -942,37 +950,52 @@ const Inventory = () => {
                                 <div className="bg-[#0d0f0e] border border-[#00ff80]/20 rounded-2xl p-6">
                                     <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
                                         <Boxes size={16} className="text-[#00ff80]" />
-                                        Nhập số lượng muốn nhập từ lô {selectedCentralBatch.batchNumber}
+                                        Nhập số lượng muốn lấy từ lô {selectedCentralBatch.batchNumber}
                                     </h3>
 
                                     <div className="grid grid-cols-2 gap-4 mb-6">
                                         <div>
                                             <label className="text-xs font-bold text-white/60 uppercase tracking-wider block mb-2">
-                                                Số lượng ({selectedMedicineDetail.baseUnit})
+                                                Chọn đơn vị nhập
                                             </label>
-                                            <input
-                                                type="number"
-                                                value={importQuantity.boxes}
-                                                onChange={(e) => setImportQuantity({ ...importQuantity, boxes: e.target.value })}
-                                                placeholder="0"
-                                                min="0"
-                                                max={Math.floor(selectedCentralBatch.quantityStd / (selectedMedicineDetail.conversionRate || 1))}
-                                                className="w-full bg-[#161a19] border border-white/10 rounded-xl py-3 px-4 text-lg font-bold focus:outline-none focus:border-[#00ff80]/40 transition-all text-white"
-                                            />
+                                            <select
+                                                value={importQuantity.unitType}
+                                                onChange={(e) => setImportQuantity({ ...importQuantity, unitType: e.target.value })}
+                                                className="w-full bg-[#161a19] border border-white/10 rounded-xl py-3 px-4 text-sm font-bold focus:outline-none focus:border-[#00ff80]/40 transition-all text-white appearance-none cursor-pointer"
+                                            >
+                                                <option value="base">{selectedMedicineDetail.baseUnit} (Gốc)</option>
+                                                <option value="sub">{selectedMedicineDetail.subUnit} (Lẻ)</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-white/60 uppercase tracking-wider block mb-2">
-                                                Số lượng lẻ ({selectedMedicineDetail.subUnit})
+                                                Số lượng muốn nhập
                                             </label>
                                             <input
                                                 type="number"
-                                                value={importQuantity.units}
-                                                onChange={(e) => setImportQuantity({ ...importQuantity, units: e.target.value })}
+                                                value={importQuantity.value}
+                                                onChange={(e) => setImportQuantity({ ...importQuantity, value: e.target.value })}
                                                 placeholder="0"
                                                 min="0"
-                                                max={selectedMedicineDetail.conversionRate - 1}
+                                                max={importQuantity.unitType === 'base'
+                                                    ? Math.floor((selectedCentralBatch.quantityStd || 0) / (selectedMedicineDetail.conversionRate || 1))
+                                                    : (selectedCentralBatch.quantityStd || 0)
+                                                }
                                                 className="w-full bg-[#161a19] border border-white/10 rounded-xl py-3 px-4 text-lg font-bold focus:outline-none focus:border-[#00ff80]/40 transition-all text-white"
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl mb-6">
+                                        <p className="text-sm font-bold text-white/60">Quy đổi ra đơn vị bán lẻ:</p>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-2xl font-black text-[#00ff80]">
+                                                {importQuantity.unitType === 'base'
+                                                    ? (parseInt(importQuantity.value) || 0) * (selectedMedicineDetail.conversionRate || 1)
+                                                    : (parseInt(importQuantity.value) || 0)
+                                                }
+                                            </span>
+                                            <span className="text-sm font-bold text-white/40">{selectedMedicineDetail.subUnit}</span>
                                         </div>
                                     </div>
 
@@ -981,7 +1004,8 @@ const Inventory = () => {
                                         disabled={loading}
                                         className="w-full bg-[#00ff80] hover:bg-[#00e673] disabled:opacity-50 text-[#04110b] font-black uppercase tracking-widest text-sm px-6 py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_10px_20px_rgba(0,255,128,0.2)] active:scale-95"
                                     >
-                                        Nhập Thuốc
+                                        <CheckCircle size={18} strokeWidth={3} />
+                                        Xác nhận nhập vào kho chi nhánh
                                     </button>
                                 </div>
                             )}

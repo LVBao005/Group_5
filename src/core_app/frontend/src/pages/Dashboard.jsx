@@ -71,7 +71,7 @@ const Dashboard = () => {
             }
 
             // Load category data
-            const categoryRes = await dashboardService.getRevenueByCategory();
+            const categoryRes = await dashboardService.getRevenueByCategory(period);
             if (categoryRes.success) {
                 setCategoryData(categoryRes.data);
             }

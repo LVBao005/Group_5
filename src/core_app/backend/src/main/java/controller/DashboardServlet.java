@@ -71,7 +71,7 @@ public class DashboardServlet extends HttpServlet {
                     getRevenueTimeline(request, out);
                     break;
                 case "/revenue-by-category":
-                    getRevenueByCategory(out);
+                    getRevenueByCategory(request, out);
                     break;
                 case "/alerts":
                     getAlerts(out);
@@ -295,26 +295,47 @@ public class DashboardServlet extends HttpServlet {
     /**
      * Get revenue breakdown by medicine category
      */
-    private void getRevenueByCategory(PrintWriter out) throws SQLException, ClassNotFoundException {
+    private void getRevenueByCategory(HttpServletRequest request, PrintWriter out)
+            throws SQLException, ClassNotFoundException {
         Connection conn = null;
         try {
             conn = dbContext.getConnection();
             conn.setAutoCommit(false);
 
-            String query = "SELECT c.category_name as category, " +
-                    "SUM(id.total_std_quantity * id.unit_price) as revenue, " +
-                    "COUNT(DISTINCT i.invoice_id) as order_count " +
-                    "FROM invoice_details id " +
-                    "JOIN batches b ON id.batch_id = b.batch_id " +
-                    "JOIN medicines m ON b.medicine_id = m.medicine_id " +
-                    "JOIN categories c ON m.category_id = c.category_id " +
-                    "JOIN invoices i ON id.invoice_id = i.invoice_id " +
-                    "GROUP BY c.category_id, c.category_name " +
-                    "ORDER BY revenue DESC";
+            String period = request.getParameter("period");
+            if (period == null)
+                period = "all";
+
+            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder.append("SELECT c.category_name as category, ");
+            queryBuilder.append("SUM(id.total_std_quantity * id.unit_price) as revenue, ");
+            queryBuilder.append("COUNT(DISTINCT i.invoice_id) as order_count ");
+            queryBuilder.append("FROM invoice_details id ");
+            queryBuilder.append("JOIN batches b ON id.batch_id = b.batch_id ");
+            queryBuilder.append("JOIN medicines m ON b.medicine_id = m.medicine_id ");
+            queryBuilder.append("JOIN categories c ON m.category_id = c.category_id ");
+            queryBuilder.append("JOIN invoices i ON id.invoice_id = i.invoice_id ");
+
+            // Apply date filter
+            switch (period) {
+                case "today":
+                    queryBuilder.append("WHERE DATE(i.invoice_date) = CURDATE() ");
+                    break;
+                case "week":
+                    queryBuilder.append("WHERE i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) ");
+                    break;
+                case "month":
+                    queryBuilder.append("WHERE i.invoice_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) ");
+                    break;
+                // 'all' doesn't need a filter
+            }
+
+            queryBuilder.append("GROUP BY c.category_id, c.category_name ");
+            queryBuilder.append("ORDER BY revenue DESC");
 
             List<Map<String, Object>> categories = new ArrayList<>();
 
-            try (PreparedStatement ps = conn.prepareStatement(query);
+            try (PreparedStatement ps = conn.prepareStatement(queryBuilder.toString());
                     ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> category = new HashMap<>();
@@ -325,7 +346,7 @@ public class DashboardServlet extends HttpServlet {
                 }
             }
 
-            out.write(gson.toJson(Map.of("success", true, "data", categories)));
+            out.write(gson.toJson(Map.of("success", true, "data", categories, "period", period)));
 
         } finally {
             if (conn != null)
