@@ -59,7 +59,7 @@ const Dashboard = () => {
             setIsRefreshing(true);
 
             // Load stats
-            const statsRes = await dashboardService.getStats();
+            const statsRes = await dashboardService.getStats(period);
             if (statsRes.success) {
                 setStats(statsRes.data);
             }

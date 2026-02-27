@@ -65,7 +65,7 @@ public class DashboardServlet extends HttpServlet {
 
             switch (pathInfo) {
                 case "/stats":
-                    getOverallStats(out);
+                    getOverallStats(request, out);
                     break;
                 case "/revenue-timeline":
                     getRevenueTimeline(request, out);
@@ -93,55 +93,71 @@ public class DashboardServlet extends HttpServlet {
     /**
      * Get overall statistics (total revenue, orders, medicines count)
      */
-    private void getOverallStats(PrintWriter out) throws SQLException, ClassNotFoundException {
+    private void getOverallStats(HttpServletRequest request, PrintWriter out)
+            throws SQLException, ClassNotFoundException {
         Connection conn = null;
         try {
             conn = dbContext.getConnection();
             conn.setAutoCommit(false);
 
+            String period = request.getParameter("period");
+            if (period == null)
+                period = "today";
+
             Map<String, Object> stats = new HashMap<>();
 
-            // Total Revenue Today
-            String revenueQuery = "SELECT COALESCE(SUM(total_amount), 0) as total_revenue " +
-                    "FROM invoices " +
-                    "WHERE DATE(invoice_date) = CURDATE()";
-            try (PreparedStatement ps = conn.prepareStatement(revenueQuery);
+            // 1. Total Revenue in Period
+            StringBuilder revenueQuery = new StringBuilder(
+                    "SELECT COALESCE(SUM(total_amount), 0) as total_revenue FROM invoices ");
+            applyDateFilter(revenueQuery, period, "invoice_date");
+            try (PreparedStatement ps = conn.prepareStatement(revenueQuery.toString());
                     ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     stats.put("totalRevenue", rs.getDouble("total_revenue"));
                 }
             }
 
-            // Total Orders Today
-            String ordersQuery = "SELECT COUNT(*) as total_orders " +
-                    "FROM invoices " +
-                    "WHERE DATE(invoice_date) = CURDATE()";
-            try (PreparedStatement ps = conn.prepareStatement(ordersQuery);
+            // 2. Total Orders in Period
+            StringBuilder ordersQuery = new StringBuilder("SELECT COUNT(*) as total_orders FROM invoices ");
+            applyDateFilter(ordersQuery, period, "invoice_date");
+            try (PreparedStatement ps = conn.prepareStatement(ordersQuery.toString());
                     ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     stats.put("totalOrders", rs.getInt("total_orders"));
                 }
             }
 
-            // Total Medicines
-            String medicinesQuery = "SELECT COUNT(DISTINCT medicine_id) as total_medicines FROM medicines";
-            try (PreparedStatement ps = conn.prepareStatement(medicinesQuery);
+            // 3. New Medicines in Period (or Total if period is 'all')
+            StringBuilder medicinesQuery = new StringBuilder(
+                    "SELECT COUNT(DISTINCT medicine_id) as total_medicines FROM medicines ");
+            if (!"all".equals(period)) {
+                applyDateFilter(medicinesQuery, period, "created_at");
+            }
+            try (PreparedStatement ps = conn.prepareStatement(medicinesQuery.toString());
                     ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     stats.put("totalMedicines", rs.getInt("total_medicines"));
                 }
             }
 
-            // Total Customers
-            String customersQuery = "SELECT COUNT(*) as total_customers FROM customers";
-            try (PreparedStatement ps = conn.prepareStatement(customersQuery);
+            // 4. Customers with Activity in Period (or Total if period is 'all')
+            StringBuilder customersQuery = new StringBuilder();
+            if ("all".equals(period)) {
+                customersQuery.append("SELECT COUNT(*) as total_customers FROM customers");
+            } else {
+                customersQuery.append("SELECT COUNT(DISTINCT customer_id) as total_customers FROM invoices ");
+                applyDateFilter(customersQuery, period, "invoice_date");
+                customersQuery.append(" AND customer_id IS NOT NULL");
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(customersQuery.toString());
                     ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     stats.put("totalCustomers", rs.getInt("total_customers"));
                 }
             }
 
-            // Low Stock Alert Count
+            // Low Stock Alert Count (Keep overall)
             String lowStockQuery = "SELECT COUNT(DISTINCT i.batch_id) as low_stock_count " +
                     "FROM inventory i " +
                     "WHERE i.quantity_std < 50";
@@ -152,7 +168,7 @@ public class DashboardServlet extends HttpServlet {
                 }
             }
 
-            // Expiring Soon Alert Count
+            // Expiring Soon Alert Count (Keep overall)
             String expiringSoonQuery = "SELECT COUNT(DISTINCT batch_id) as expiring_count " +
                     "FROM batches " +
                     "WHERE expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)";
@@ -168,6 +184,24 @@ public class DashboardServlet extends HttpServlet {
         } finally {
             if (conn != null)
                 conn.close();
+        }
+    }
+
+    /**
+     * Helper to apply date filter to a query builder
+     */
+    private void applyDateFilter(StringBuilder query, String period, String dateColumn) {
+        switch (period) {
+            case "today":
+                query.append("WHERE DATE(").append(dateColumn).append(") = CURDATE() ");
+                break;
+            case "week":
+                query.append("WHERE ").append(dateColumn).append(" >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) ");
+                break;
+            case "month":
+                query.append("WHERE ").append(dateColumn).append(" >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) ");
+                break;
+            // 'all' does not add WHERE clause
         }
     }
 

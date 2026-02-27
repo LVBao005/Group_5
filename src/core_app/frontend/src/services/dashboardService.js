@@ -8,9 +8,13 @@ const dashboardService = {
     /**
      * Get overall statistics
      */
-    getStats: async () => {
+    /**
+     * Get overall statistics
+     * @param {string} period - 'today', 'week', 'month', or 'all'
+     */
+    getStats: async (period = 'today') => {
         try {
-            const response = await axios.get('/dashboard/stats');
+            const response = await axios.get(`/dashboard/stats?period=${period}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
