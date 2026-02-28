@@ -40,6 +40,21 @@ export const invoiceService = {
     },
 
     /**
+     * Get customer by phone number
+     * @param {string} phone - Customer phone number
+     * @returns {Promise<Object>} Customer object
+     */
+    getCustomerByPhone: async (phone) => {
+        try {
+            const response = await axios.get(`/customers?phoneNumber=${phone}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching customer by phone:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Get all invoices with full details
      * @param {Object} filters - Optional filters (dateFrom, dateTo, pharmacistId, branchId, isSimulated)
      * @returns {Promise<Array>} Array of invoices with details
@@ -47,13 +62,13 @@ export const invoiceService = {
     getInvoices: async (filters = {}) => {
         try {
             const params = new URLSearchParams();
-            
+
             if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
             if (filters.dateTo) params.append('dateTo', filters.dateTo);
             if (filters.pharmacistId) params.append('pharmacistId', filters.pharmacistId);
             if (filters.branchId) params.append('branchId', filters.branchId);
             if (filters.isSimulated !== undefined) params.append('isSimulated', filters.isSimulated);
-            
+
             const response = await axios.get(`/invoices?${params.toString()}`);
             return response.data;
         } catch (error) {
@@ -85,10 +100,10 @@ export const invoiceService = {
     getInvoiceStats: async (filters = {}) => {
         try {
             const params = new URLSearchParams();
-            
+
             if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
             if (filters.dateTo) params.append('dateTo', filters.dateTo);
-            
+
             const response = await axios.get(`/invoices/stats?${params.toString()}`);
             return response.data;
         } catch (error) {

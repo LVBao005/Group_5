@@ -32,8 +32,12 @@ public class CustomerDAO {
     }
 
     public Customer getCustomerByPhone(String phoneNumber) throws SQLException {
+        return getCustomerByPhone(phoneNumber, this.connection);
+    }
+
+    public Customer getCustomerByPhone(String phoneNumber, Connection conn) throws SQLException {
         String sql = "SELECT * FROM customers WHERE phone_number = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, phoneNumber);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -45,10 +49,23 @@ public class CustomerDAO {
     }
 
     public void createCustomer(Customer customer) throws SQLException {
+        createCustomer(customer, this.connection);
+    }
+
+    public void createCustomer(Customer customer, Connection conn) throws SQLException {
         String sql = "INSERT INTO customers (phone_number, customer_name) VALUES (?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, customer.getPhoneNumber());
             ps.setString(2, customer.getCustomerName());
+            ps.executeUpdate();
+        }
+    }
+
+    public void updateCustomerPoints(int customerId, int pointsDelta, Connection conn) throws SQLException {
+        String sql = "UPDATE customers SET points = points + ? WHERE customer_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, pointsDelta);
+            ps.setInt(2, customerId);
             ps.executeUpdate();
         }
     }
@@ -97,6 +114,7 @@ public class CustomerDAO {
         c.setCustomerId(rs.getInt("customer_id"));
         c.setPhoneNumber(rs.getString("phone_number"));
         c.setCustomerName(rs.getString("customer_name"));
+        c.setPoints(rs.getInt("points"));
         return c;
     }
 }

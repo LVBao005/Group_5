@@ -2505,3 +2505,104 @@ npm install
 **Tình trạng:** ✅ Hoàn thành xuất sắc toàn bộ yêu cầu.
 **Người thực hiện:** Antigravity AI
 **Ngày cập nhật:** 27/02/2026
+
+---
+
+## 📋 Cập Nhật Hoạt Động - 28/02/2026
+
+**Mục tiêu chính:**
+- Sửa lỗi hiển thị Chi nhánh và Điểm (points) của khách hàng ở trang POS
+- Cập nhật quy tắc cộng điểm và UI sử dụng điểm tích lũy
+- Đồng bộ doanh thu giữa Dashboard Stats và Category Pie Chart
+
+---
+
+### 1️⃣ POS - Sửa lỗi Chi nhánh & Điểm tích lũy
+
+#### 🐛 **Vấn đề:**
+- **Chi nhánh:** Luôn hiển thị "Quầy số 01" (hardcoded).
+- **Điểm của khách:** Dù database có (ví dụ 926 điểm) nhưng POS luôn hiện 0. Nguyên nhân do mismatch tên thuộc tính (`points` vs `points`).
+- **Phản hồi:** Cần hiển thị số điểm khách sắp nhận được ngay khi chọn sản phẩm.
+
+#### ✅ **Hành động & Code:**
+- **Files sửa:** `POS.jsx`.
+- **Chi tiết:** 
+    - Lấy thông tin chi nhánh từ object `user` trong `localStorage` (`user.branch_name`).
+    - Sửa logic parse JSON khi check khách hàng để gán đúng giá trị `customerPoints`.
+    - **Tính năng mới:** Thêm ô badge hiển thị số điểm cộng thêm (`+ X điểm`) màu xanh neon bên cạnh dòng Tạm tính. Cứ mỗi 10đ thanh toán khách được cộng thêm 1 điểm.
+
+---
+
+### 2️⃣ Refactor Cơ chế sử dụng Điểm thưởng
+
+#### 🚀 **Yêu cầu:**
+- Sửa công thức: **10 VNĐ = 1 Điểm** (1000 VNĐ = 100 Điểm).
+- Không cho người dùng chọn số điểm (bỏ dropdown select). Khi tích chọn "Sử dụng điểm", hệ thống tự động trừ toàn bộ số điểm hiện có (làm tròn xuống 1000) và không vượt quá số tiền phải trả.
+
+#### ✅ **Hành động & Code:**
+- **Frontend:** Cập nhật `POS.jsx` để tự động tính `pointsToUse` khi người dùng tick checkbox.
+- **Backend:** Cập nhật `InvoiceDAO.java` để thực hiện tính toán `pointsEarned` theo tỉ lệ 1/10 nếu phía frontend không gửi giá trị này (để đảm bảo tính chính xác ngay cả khi app lỗi).
+- **Kết quả:** UI tinh gọn hơn, người dùng chỉ cần tick/untick là số tiền tự động cập nhật ngay lập tức.
+
+---
+
+### 3️⃣ Đồng bộ báo cáo Doanh thu Dashboard
+
+#### 🐛 **Vấn đề:**
+- "Doanh Thu Hôm Nay" (201.500đ) không khớp với "Cơ Cấu Doanh Thu" (3.678.000đ).
+- **Nguyên nhân:** Doanh thu tổng (Stats) tính theo giá cuối cùng sau giảm giá. Còn Biểu đồ cơ cấu tính theo giá gốc (Unit Price * Qty) từ bảng `invoice_details`.
+
+#### ✅ **Hành động & Code:**
+- **Backend:** Cập nhật SQL query trong `DashboardServlet.java` (hàm `getRevenueByCategory`).
+- **Logic mới:** Sử dụng phương pháp phân bổ tỷ lệ. Với mỗi hóa đơn, hệ thống tính tỷ lệ đóng góp của từng món hàng vào giá trị gốc, sau đó nhân tỷ lệ đó với số tiền thực nhận (`total_amount` đã trừ điểm) của hóa đơn đó.
+- **SQL Snippet:** 
+  ```sql
+  SUM((id.total_std_quantity * id.unit_price) / (Invoice_Total_UnDiscounted) * i.total_amount)
+  ```
+- **Kết quả:** Biểu đồ cơ cấu phản ánh chính xác số tiền thực tế thu được, khớp hoàn toàn với các chỉ số thống kê khác.
+
+---
+
+### 4️⃣ Triển khai (Deployment)
+
+#### ✅ **Hành động:**
+- Biên dịch lại backend: `mvn clean package`.
+- Thực hiện deploy thủ công file `backend.war` vào thư mục `webapps` của Tomcat 9.
+- Restart service Tomcat để áp dụng các thay đổi mới về Logic Point và Dashboard SQL.
+
+---
+
+**Tình trạng:** ✅ Hoàn thành toàn bộ checklist của phiên làm việc.
+**Người thực hiện:** Antigravity AI
+**Ngày cập nhật:** 28/02/2026
+
+---
+
+### 🔍 Chi tiết mã nguồn đã sửa (Technical Diffs)
+
+#### 1. Frontend: `POS.jsx`
+- **Sửa:** Cập nhật object `branch` để lấy tên chi nhánh từ user session thay vì hardcoded.
+  ```javascript
+  // Trước
+  const branch = { branch_name: "Chi nhánh chính", address: "Hệ thống trung tâm" };
+  // Sau
+  const branch = { branch_name: user?.branch_name || "Chi nhánh chính", ... };
+  ```
+- **Sửa:** Cập nhật logic `checkCustomer` để gán đúng `data.points` cho state `customerPoints`.
+- **Thêm:** UI hiển thị điểm cộng thêm (`+ Math.floor(finalAmount / 10)` điểm) - dòng 840-848.
+- **Xóa:** Dropdown `<select>` chọn số lượng điểm dùng (dòng 823-831 cũ) và các hàm bổ trợ liên quan (`handlePointsSelect`, `getAvailablePointOptions`).
+- **Thêm:** Hiển thị số điểm trừ trực tiếp vào nhãn checkbox: `Sử dụng điểm tích lũy (-X điểm)`.
+- **Sửa:** Refactor logic `handleUsePointsChange` (dòng 340-362) để tự động hóa việc tính toán `pointsToUse`.
+
+#### 2. Backend: `InvoiceDAO.java`
+- **Sửa:** Đổi tỉ lệ tính điểm thưởng từ `(totalAmount / 1000) * 10` (1%) thành `(int) (totalAmount / 10)` (10%).
+- **Xóa:** Loại bỏ dòng khai báo dư thừa `int pointsEarned = 0` ở đầu phương thức `createInvoice` gây lỗi Java compile.
+- **Thêm:** Logic gán giá trị mặc định cho `pointsEarned` nếu JSON payload từ frontend bị thiếu.
+
+#### 3. Backend: `DashboardServlet.java`
+- **Sửa:** Thay đổi hoàn toàn logic SQL trong hàm `getRevenueByCategory` (dòng 343-368).
+- **Thêm:** Sử dụng `NULLIF` và `Subquery` để tính toán tỉ lệ doanh thu thực tế cho từng danh mục thuốc sau khi đã trừ chiết khấu.
+
+#### 4. Script & Cleanup
+- **Xóa:** Đã xóa file `backend/test_api.ps1` (đã hoàn thành nhiệm vụ test).
+- **Sửa:** Cập nhật lệnh PowerShell chạy trực tiếp trên Terminal thay vì file `.ps1` để tránh lỗi Unicode và Policy của hệ thống.

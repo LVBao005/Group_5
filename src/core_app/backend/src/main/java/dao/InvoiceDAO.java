@@ -56,7 +56,7 @@ public class InvoiceDAO {
                 String customerPhone = jsonData.get("customer_phone").getAsString();
                 if (customerPhone != null && !customerPhone.trim().isEmpty()) {
                     CustomerDAO customerDAO = new CustomerDAO();
-                    Customer customer = customerDAO.getCustomerByPhone(customerPhone);
+                    Customer customer = customerDAO.getCustomerByPhone(customerPhone, conn);
 
                     if (customer == null) {
                         // Create new customer with phone and optional name
@@ -72,14 +72,24 @@ public class InvoiceDAO {
                             }
                         }
 
-                        customerDAO.createCustomer(customer);
+                        customerDAO.createCustomer(customer, conn);
 
                         // Get the newly created customer
-                        customer = customerDAO.getCustomerByPhone(customerPhone);
+                        customer = customerDAO.getCustomerByPhone(customerPhone, conn);
                     }
 
                     if (customer != null) {
                         customerId = customer.getCustomerId();
+
+                        // Handle points used/earned via API payload
+                        int pointsUsed = jsonData.has("points_used") ? jsonData.get("points_used").getAsInt() : 0;
+                        int pointsEarned = jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
+                                : (int) (totalAmount / 10);
+
+                        int pointsDelta = pointsEarned - pointsUsed;
+                        if (pointsDelta != 0) {
+                            customerDAO.updateCustomerPoints(customerId, pointsDelta, conn);
+                        }
                     }
                 }
             }
@@ -117,7 +127,8 @@ public class InvoiceDAO {
             String sqlCheckInventory = "SELECT quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ?";
             PreparedStatement psCheckInventory = conn.prepareStatement(sqlCheckInventory);
 
-            // Update inventory (quantity_std per branch) - CHỈ cập nhật inventory tại chi nhánh
+            // Update inventory (quantity_std per branch) - CHỈ cập nhật inventory tại chi
+            // nhánh
             String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ? AND quantity_std >= ?";
             psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
 
@@ -134,16 +145,16 @@ public class InvoiceDAO {
                 psCheckInventory.setInt(1, batchId);
                 psCheckInventory.setInt(2, branchId);
                 ResultSet rsStock = psCheckInventory.executeQuery();
-                
+
                 int availableStock = 0;
                 if (rsStock.next()) {
                     availableStock = rsStock.getInt("quantity_std");
                 }
                 rsStock.close();
-                
+
                 if (availableStock < totalStdQuantity) {
-                    throw new SQLException("Không đủ số lượng tồn kho. Batch ID: " + batchId + 
-                                         ", Cần: " + totalStdQuantity + ", Còn lại: " + availableStock);
+                    throw new SQLException("Không đủ số lượng tồn kho. Batch ID: " + batchId +
+                            ", Cần: " + totalStdQuantity + ", Còn lại: " + availableStock);
                 }
 
                 // Insert detail
@@ -164,16 +175,17 @@ public class InvoiceDAO {
             }
 
             psDetail.executeBatch();
-            
+
             int[] inventoryResults = psUpdateInventory.executeBatch();
-            
+
             // Verify all inventory updates succeeded
             for (int i = 0; i < inventoryResults.length; i++) {
                 if (inventoryResults[i] == 0) {
-                    throw new SQLException("Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này.");
+                    throw new SQLException(
+                            "Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này.");
                 }
             }
-            
+
             psCheckInventory.close();
 
             conn.commit(); // Commit transaction

@@ -38,16 +38,24 @@ const POS = () => {
     const [showInvoice, setShowInvoice] = useState(false);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+
+    // Customer state
     const [phone, setPhone] = useState('');
     const [customerName, setCustomerName] = useState('');
+    const [isOldCustomer, setIsOldCustomer] = useState(false);
+    const [customerPoints, setCustomerPoints] = useState(0);
+    const [showNameInput, setShowNameInput] = useState(false);
+    const [usePoints, setUsePoints] = useState(false);
+    const [pointsToUse, setPointsToUse] = useState(0);
+
     const [searchTerm, setSearchTerm] = useState('');
 
     // Get current user and branch for the invoice
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
 
-    // Placeholder for branch info until we have a real service
-    const branch = { branch_name: "Chi nhánh chính", address: "Hệ thống trung tâm" };
+    // Use branch info from user object
+    const branch = { branch_name: user?.branch_name || "Chi nhánh chính", address: "Hệ thống trung tâm" };
 
     // Load Data
     useEffect(() => {
@@ -287,6 +295,64 @@ const POS = () => {
     };
 
     const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const finalAmount = Math.max(0, totalAmount - pointsToUse);
+
+    const checkCustomer = async () => {
+        if (!phone.trim()) {
+            alert('Vui lòng nhập số điện thoại');
+            return;
+        }
+
+        try {
+            const data = await invoiceService.getCustomerByPhone(phone);
+            if (data && data.customer_id) {
+                // Old customer
+                setIsOldCustomer(true);
+                setCustomerName(data.customer_name || '');
+                setCustomerPoints(data.points || 0);
+                setShowNameInput(true);
+
+                // Reset points logic
+                setUsePoints(false);
+                setPointsToUse(0);
+            } else {
+                // New customer
+                setIsOldCustomer(false);
+                setCustomerName('');
+                setCustomerPoints(0);
+                setShowNameInput(true);
+                setUsePoints(false);
+                setPointsToUse(0);
+            }
+        } catch (error) {
+            console.error('Lỗi kiểm tra khách hàng:', error);
+            // Default to new customer if error (might be just not found)
+            setIsOldCustomer(false);
+            setCustomerName('');
+            setCustomerPoints(0);
+            setShowNameInput(true);
+            setUsePoints(false);
+            setPointsToUse(0);
+        }
+    };
+
+    const handleUsePointsChange = (e) => {
+        const checked = e.target.checked;
+        setUsePoints(checked);
+        if (checked && customerPoints >= 1000) {
+            // "giảm tối đa là bằng số tiền, tròn 1000"
+            const autoUsePoints = Math.min(
+                Math.floor(customerPoints / 1000) * 1000,
+                Math.ceil(totalAmount / 1000) * 1000
+            );
+
+            setPointsToUse(autoUsePoints > totalAmount ? Math.floor(totalAmount / 1000) * 1000 + 1000 : autoUsePoints);
+        } else {
+            setPointsToUse(0);
+        }
+    };
+
+
 
     const handleCheckout = () => {
         if (cart.length > 0) {
@@ -343,14 +409,18 @@ const POS = () => {
         }
 
         // Construct SQL-aligned payload
+        const pointsEarned = Math.floor(finalAmount / 10);
+
         const payload = {
             branch_id: user?.branch_id || 1,
             pharmacist_id: user?.pharmacist_id || 1,
             customer_phone: phone || null, // Send phone number to backend
             customer_name: customerName || null, // Send customer name to backend
-            total_amount: totalAmount,
+            total_amount: finalAmount, // send final amount after discount
             is_simulated: false, // Real sale from POS
-            details: detailsPayload
+            details: detailsPayload,
+            points_used: pointsToUse,
+            points_earned: pointsEarned
         };
 
         console.log('💰 Creating invoice with payload:', payload);
@@ -368,6 +438,11 @@ const POS = () => {
                 setSuccess(false);
                 setPhone('');
                 setCustomerName('');
+                setIsOldCustomer(false);
+                setCustomerPoints(0);
+                setShowNameInput(false);
+                setUsePoints(false);
+                setPointsToUse(0);
                 setLoading(false);
 
                 // Reload inventory data to refresh stock
@@ -665,32 +740,92 @@ const POS = () => {
                     {/* Bottom Panel */}
                     <div className="mt-8 pt-8 border-t border-white/5 space-y-6">
                         <div className="space-y-3">
-                            <div className="relative group">
+                            <div className="relative group flex gap-2">
                                 <input
                                     type="text"
-                                    placeholder="Tên khách hàng (tùy chọn)"
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"
-                                />
-                            </div>
-                            <div className="relative group">
-                                <input
-                                    type="text"
-                                    placeholder="Số điện thoại khách hàng (tùy chọn)"
+                                    placeholder="Số điện thoại khách hàng"
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"
+                                    onChange={(e) => {
+                                        setPhone(e.target.value);
+                                        setShowNameInput(false);
+                                        setIsOldCustomer(false);
+                                        setCustomerPoints(0);
+                                        setUsePoints(false);
+                                        setPointsToUse(0);
+                                    }}
+                                    className="flex-1 bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"
                                 />
+                                <button
+                                    onClick={checkCustomer}
+                                    className="bg-[#00ff80]/10 hover:bg-[#00ff80]/20 text-[#00ff80] px-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border border-[#00ff80]/20"
+                                >
+                                    Kiểm tra
+                                </button>
                             </div>
-                            <div className="flex justify-between items-center px-2">
-                                <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Tạm tính</span>
+
+                            {showNameInput && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="relative group flex items-center gap-3">
+                                        <input
+                                            type="text"
+                                            placeholder="Tên khách hàng"
+                                            value={customerName}
+                                            onChange={(e) => setCustomerName(e.target.value)}
+                                            readOnly={isOldCustomer}
+                                            className={cn(
+                                                "flex-1 bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10",
+                                                isOldCustomer && "opacity-60 cursor-not-allowed"
+                                            )}
+                                        />
+                                        {isOldCustomer && (
+                                            <div className="bg-blue-500/10 text-blue-400 text-xs font-black px-4 py-3.5 rounded-2xl border border-blue-500/20 text-center uppercase tracking-widest shrink-0">
+                                                {customerPoints} điểm
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {isOldCustomer && customerPoints >= 1000 && (
+                                        <div className="p-4 bg-[#0d0f0e] border border-[#00ff80]/20 rounded-2xl animate-in fade-in duration-300">
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={usePoints}
+                                                    onChange={handleUsePointsChange}
+                                                    className="w-5 h-5 rounded border-white/10 text-[#00ff80] focus:ring-[#00ff80]/30 cursor-pointer"
+                                                />
+                                                <span className="text-sm font-bold text-white">
+                                                    Sử dụng điểm tích lũy {usePoints && <span className="text-[#00ff80]">(-{formatPrice(pointsToUse)} điểm)</span>}
+                                                </span>
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center px-2 mt-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Tạm tính</span>
+                                    {showNameInput && totalAmount >= 1000 && (
+                                        <div className="bg-[#00ff80]/10 text-[#00ff80] text-[10px] font-black px-2 py-0.5 rounded-lg border border-[#00ff80]/20 flex items-center gap-1 animate-in fade-in zoom-in duration-300">
+                                            <span>+</span>
+                                            <span>{Math.floor(finalAmount / 10)} điểm</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <span className="font-black text-white/40 tabular-nums">{formatPrice(totalAmount)} đ</span>
                             </div>
-                            <div className="flex justify-between items-end px-2 pt-2">
+
+                            {pointsToUse > 0 && (
+                                <div className="flex justify-between items-center px-2 text-[#00ff80]">
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Giảm giá (Điểm)</span>
+                                    <span className="font-black tabular-nums">- {formatPrice(pointsToUse)} đ</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-end px-2 pt-2 border-t border-white/5">
                                 <span className="text-xs font-black text-white uppercase tracking-[0.2em]">Tổng thanh toán</span>
                                 <span className="text-3xl font-black text-white tracking-tighter tabular-nums leading-none">
-                                    {formatPrice(totalAmount)} <span className="text-xs ml-1 font-black opacity-30 text-white">đ</span>
+                                    {formatPrice(finalAmount)} <span className="text-xs ml-1 font-black opacity-30 text-white">đ</span>
                                 </span>
                             </div>
                         </div>
@@ -749,7 +884,7 @@ const POS = () => {
                                             <User size={16} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-black text-white">{user?.fullName || 'BẢO'}</p>
+                                            <p className="text-sm font-black text-white">{user?.fullName || user?.pharmacist_name || 'BẢO'}</p>
                                             <p className="text-[10px] text-[#00ff80] font-black uppercase">Pharmacist</p>
                                         </div>
                                     </div>
@@ -768,8 +903,7 @@ const POS = () => {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-2">Chi nhánh</p>
-                                    <p className="text-sm font-black text-white uppercase">{branch?.branch_name || 'Quầy số 01'}</p>
-                                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-0.5">{branch?.address || '123 Lê Lợi, Q1, HCM'}</p>
+                                    <p className="text-sm font-black text-white uppercase">{branch?.branch_name}</p>
                                 </div>
                             </div>
 
@@ -799,7 +933,7 @@ const POS = () => {
                                 <div className="flex justify-between items-center px-2">
                                     <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Cần thanh toán</span>
                                     <span className="text-4xl font-black text-[#00ff80] tracking-tighter tabular-nums">
-                                        {formatPrice(totalAmount)} <span className="text-xs ml-1">đ</span>
+                                        {formatPrice(finalAmount)} <span className="text-xs ml-1">đ</span>
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-4">

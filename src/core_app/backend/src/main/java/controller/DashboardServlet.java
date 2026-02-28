@@ -342,7 +342,16 @@ public class DashboardServlet extends HttpServlet {
 
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.append("SELECT c.category_name as category, ");
-            queryBuilder.append("SUM(id.total_std_quantity * id.unit_price) as revenue, ");
+
+            // Proportional distribution of total_amount among items
+            // (Item_Value / Invoice_Total_Value) * Invoice_Final_Amount
+            queryBuilder.append("SUM( ");
+            queryBuilder.append("  (id.total_std_quantity * id.unit_price) / ");
+            queryBuilder.append(
+                    "  NULLIF((SELECT SUM(id2.total_std_quantity * id2.unit_price) FROM invoice_details id2 WHERE id2.invoice_id = i.invoice_id), 0) ");
+            queryBuilder.append("  * i.total_amount ");
+            queryBuilder.append(") as revenue, ");
+
             queryBuilder.append("COUNT(DISTINCT i.invoice_id) as order_count ");
             queryBuilder.append("FROM invoice_details id ");
             queryBuilder.append("JOIN batches b ON id.batch_id = b.batch_id ");
@@ -374,7 +383,9 @@ public class DashboardServlet extends HttpServlet {
                 while (rs.next()) {
                     Map<String, Object> category = new HashMap<>();
                     category.put("name", rs.getString("category"));
-                    category.put("value", rs.getDouble("revenue"));
+                    // Use Math.round to return an integer formatted sum, preventing floating point
+                    // quirks
+                    category.put("value", Math.round(rs.getDouble("revenue")));
                     category.put("orders", rs.getInt("order_count"));
                     categories.add(category);
                 }
