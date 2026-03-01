@@ -15,6 +15,7 @@ import RevenueChart from '../components/dashboard/RevenueChart';
 import CategoryPieChart from '../components/dashboard/CategoryPieChart';
 import AlertsList from '../components/dashboard/AlertsList';
 import dashboardService from '../services/dashboardService';
+import LiveClock from '../components/common/LiveClock';
 
 const Dashboard = () => {
     const [stats, setStats] = useState({
@@ -33,27 +34,6 @@ const Dashboard = () => {
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Current time display
-    const [currentTime, setCurrentTime] = useState(new Date());
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    const formatDateTime = (date) => {
-        const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-        const day = days[date.getDay()];
-        const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' });
-        const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        return { day, date: dateStr, time: timeStr };
-    };
-
-    const { day, date, time } = formatDateTime(currentTime);
-
-    // Load all dashboard data
     const loadDashboardData = async () => {
         try {
             setIsRefreshing(true);
@@ -150,12 +130,7 @@ const Dashboard = () => {
                             <span className="hidden lg:inline">Làm mới</span>
                         </button>
 
-                        <div className="text-right">
-                            <p className="text-sm font-black text-white leading-none">{time}</p>
-                            <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">
-                                {day}, {date}
-                            </p>
-                        </div>
+                        <LiveClock />
 
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />

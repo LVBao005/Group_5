@@ -18,6 +18,7 @@ import {
 import Sidebar from '../components/Sidebar';
 import { invoiceService } from '../services/invoiceService';
 import { formatCurrency, formatDate } from '../utils/format';
+import LiveClock from '../components/common/LiveClock';
 
 const Invoices = () => {
     // State management
@@ -156,10 +157,7 @@ const Invoices = () => {
                     </button>
 
                     <div className="flex items-center gap-6 ml-auto">
-                        <div className="text-right">
-                            <p className="text-sm font-black text-white leading-none">{new Date().toLocaleTimeString('vi-VN')}</p>
-                            <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">Hôm nay</p>
-                        </div>
+                        <LiveClock />
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />
                         </div>

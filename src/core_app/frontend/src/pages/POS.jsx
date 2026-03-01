@@ -24,6 +24,7 @@ import Sidebar from '../components/Sidebar';
 import { cn } from '../lib/utils';
 import { invoiceService } from '../services/invoiceService';
 import { inventoryService } from '../services/inventoryService';
+import LiveClock from '../components/common/LiveClock';
 
 const POS = () => {
     const [medicines, setMedicines] = useState([]);
@@ -179,10 +180,22 @@ const POS = () => {
     };
 
     const handleUpdateLocalQty = (id, delta) => {
-        setQuantities(prev => ({
-            ...prev,
-            [id]: Math.max(0, (prev[id] || 1) + delta)
-        }));
+        const medicine = medicines.find(m => m.medicine_id === id);
+        if (!medicine) return;
+
+        const selectedUnit = selectedUnits[id] || 'base';
+        const totalTabletsStock = availableStock[id] || 0;
+        const conversionRate = medicine.conversion_rate || 1;
+        const maxAvailable = selectedUnit === 'sub' ? totalTabletsStock : Math.floor(totalTabletsStock / conversionRate);
+
+        setQuantities(prev => {
+            const current = prev[id] || 1;
+            const nextVal = Math.max(0, current + delta);
+            return {
+                ...prev,
+                [id]: Math.min(nextVal, maxAvailable)
+            };
+        });
     };
 
     const handleManualQtyChange = (id, value) => {
@@ -192,9 +205,18 @@ const POS = () => {
         }
         const val = parseInt(value);
         if (isNaN(val)) return;
+
+        const medicine = medicines.find(m => m.medicine_id === id);
+        if (!medicine) return;
+
+        const selectedUnit = selectedUnits[id] || 'base';
+        const totalTabletsStock = availableStock[id] || 0;
+        const conversionRate = medicine.conversion_rate || 1;
+        const maxAvailable = selectedUnit === 'sub' ? totalTabletsStock : Math.floor(totalTabletsStock / conversionRate);
+
         setQuantities(prev => ({
             ...prev,
-            [id]: Math.max(0, val) // Allow 0 during typing
+            [id]: Math.min(Math.max(0, val), maxAvailable)
         }));
     };
 
@@ -203,6 +225,22 @@ const POS = () => {
             ...prev,
             [medicineId]: unit
         }));
+
+        // Adjust local quantity if it exceeds max available in new unit
+        const medicine = medicines.find(m => m.medicine_id === medicineId);
+        if (medicine) {
+            const totalTabletsStock = availableStock[medicineId] || 0;
+            const conversionRate = medicine.conversion_rate || 1;
+            const maxAvailable = unit === 'sub' ? totalTabletsStock : Math.floor(totalTabletsStock / conversionRate);
+
+            setQuantities(prev => {
+                const current = prev[medicineId] || 1;
+                if (current > maxAvailable) {
+                    return { ...prev, [medicineId]: maxAvailable };
+                }
+                return prev;
+            });
+        }
     };
 
     const addToCart = (medicine) => {
@@ -215,13 +253,15 @@ const POS = () => {
         const price = isSub ? medicine.sub_sell_price : medicine.base_sell_price;
         const conversion = medicine.conversion_rate || 1;
 
-        // Calculate requested quantity in BASE units
-        const requestedQuota = isSub ? Math.ceil(qty / conversion) : qty;
-        const currentAvailable = availableStock[medicine.medicine_id] || 0;
+        // Calculate requested quantity in SMALLER units (std)
+        const requestedStdQty = isSub ? qty : (qty * conversion);
+        const currentAvailableStd = availableStock[medicine.medicine_id] || 0;
 
         // Check if enough stock available
-        if (requestedQuota > currentAvailable) {
-            alert(`Không đủ tồn kho! Chỉ còn ${currentAvailable} ${medicine.base_unit}`);
+        if (requestedStdQty > currentAvailableStd) {
+            const boxes = Math.floor(currentAvailableStd / conversion);
+            const tablets = currentAvailableStd % conversion;
+            alert(`Không đủ tồn kho! Chỉ còn ${boxes} ${medicine.base_unit}${tablets > 0 ? ` + ${tablets} ${medicine.sub_unit}` : ''}`);
             return;
         }
 
@@ -243,14 +283,14 @@ const POS = () => {
             }]);
         }
 
-        // Deduct from available stock
+        // Deduct from available stock (in std units)
         setAvailableStock(prev => ({
             ...prev,
-            [medicine.medicine_id]: prev[medicine.medicine_id] - requestedQuota
+            [medicine.medicine_id]: prev[medicine.medicine_id] - requestedStdQty
         }));
 
-        // Reset quantity
-        setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 1 }));
+        // Reset quantity to 0
+        setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 0 }));
     };
 
     const removeFromCart = (item) => {
@@ -259,15 +299,12 @@ const POS = () => {
         if (!medicine) return;
 
         const conversion = medicine.conversion_rate || 1;
-        const isSub = item.unit === medicine.sub_unit;
-
-        // Calculate how much to restore in BASE units
-        const restoreQuota = isSub ? Math.ceil(item.quantity / conversion) : item.quantity;
+        const requestedStdQty = item.is_sub ? item.quantity : (item.quantity * conversion);
 
         // Restore stock
         setAvailableStock(prev => ({
             ...prev,
-            [item.medicine_id]: prev[item.medicine_id] + restoreQuota
+            [item.medicine_id]: prev[item.medicine_id] + requestedStdQty
         }));
 
         // Remove from cart
@@ -281,12 +318,11 @@ const POS = () => {
             if (!medicine) return;
 
             const conversion = medicine.conversion_rate || 1;
-            const isSub = item.unit === medicine.sub_unit;
-            const restoreQuota = isSub ? Math.ceil(item.quantity / conversion) : item.quantity;
+            const requestedStdQty = item.is_sub ? item.quantity : (item.quantity * conversion);
 
             setAvailableStock(prev => ({
                 ...prev,
-                [item.medicine_id]: prev[item.medicine_id] + restoreQuota
+                [item.medicine_id]: (prev[item.medicine_id] || 0) + requestedStdQty
             }));
         });
 
@@ -478,10 +514,7 @@ const POS = () => {
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
-                        <div className="text-right">
-                            <p className="text-sm font-black text-white leading-none">13:06:20</p>
-                            <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">Thứ Tư, 28 Tháng 1, 2026</p>
-                        </div>
+                        <LiveClock />
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />
                         </div>
@@ -518,17 +551,16 @@ const POS = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start mb-auto">
                         {displayMedicines.map(medicine => {
                             if (!medicine) return null; // Defensive check
-                            const localQty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 1;
+                            const localQty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 0;
                             const selectedUnit = selectedUnits[medicine.medicine_id] || 'base';
                             const displayPrice = selectedUnit === 'sub' ? medicine.sub_sell_price : medicine.base_sell_price;
                             const displayUnit = selectedUnit === 'sub' ? medicine.sub_unit : medicine.base_unit;
 
-                            // Calculate available stock in the selected unit
-                            const baseStock = availableStock[medicine.medicine_id] || 0;
+                            // Calculate available stock
+                            const totalTablets = availableStock[medicine.medicine_id] || 0;
                             const conversionRate = medicine.conversion_rate || 1;
-                            const displayStock = selectedUnit === 'sub'
-                                ? baseStock
-                                : Math.floor(baseStock / conversionRate);
+                            const boxes = Math.floor(totalTablets / conversionRate);
+                            const tablets = totalTablets % conversionRate;
 
                             return (
                                 <div key={medicine.medicine_id} className="bg-[#161a19] border border-white/5 rounded-3xl p-6 flex flex-col hover:border-[#00ff80]/30 transition-all group overflow-hidden relative">
@@ -538,18 +570,19 @@ const POS = () => {
                                     </div>
 
                                     <h3 className="text-base font-black text-white mb-2">{medicine.name}</h3>
-                                    {/* Available Stock Display - Shows in selected unit */}
+                                    {/* Available Stock Display - Shows mixed units */}
                                     <div className="flex items-center gap-2 mb-1">
                                         <PackageSearch size={14} className="text-white/30" />
                                         <span className={cn(
                                             "text-xs font-bold",
-                                            displayStock === 0 ? "text-red-400" :
-                                                displayStock < (selectedUnit === 'sub' ? 100 : 10) ? "text-yellow-400" :
+                                            totalTablets === 0 ? "text-red-400" :
+                                                totalTablets < (conversionRate * 2) ? "text-yellow-400" :
                                                     "text-white/50"
                                         )}>
-                                            Còn: {displayStock} {displayUnit}
+                                            Còn: {boxes} {medicine.base_unit}{tablets > 0 ? ` + ${tablets} ${medicine.sub_unit}` : ''}
                                         </span>
-                                    </div>                                    <div className="flex items-baseline gap-1 mb-6">
+                                    </div>
+                                    <div className="flex items-baseline gap-1 mb-6">
                                         <span className="text-xl font-black text-[#00ff80] tracking-tighter">{formatPrice(displayPrice)}</span>
                                         <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">VNĐ / {displayUnit}</span>
                                     </div>
@@ -562,8 +595,8 @@ const POS = () => {
                                                 onChange={(e) => handleUnitChange(medicine.medicine_id, e.target.value)}
                                                 className="w-full bg-[#0d0f0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#00ff80]/50 cursor-pointer appearance-none"
                                             >
-                                                <option value="base">{medicine.base_unit} (Quy chuẩn)</option>
-                                                <option value="sub">{medicine.sub_unit} (Bán lẻ)</option>
+                                                <option value="base">{medicine.base_unit}</option>
+                                                <option value="sub">{medicine.sub_unit}</option>
                                             </select>
                                         </div>
                                     )}
@@ -587,8 +620,8 @@ const POS = () => {
                                                     e.target.select();
                                                 }}
                                                 onBlur={() => {
-                                                    if (localQty === '' || localQty <= 0) {
-                                                        handleManualQtyChange(medicine.medicine_id, 1);
+                                                    if (localQty === '' || localQty < 0) {
+                                                        handleManualQtyChange(medicine.medicine_id, 0);
                                                     }
                                                 }}
                                                 className="w-12 bg-transparent text-center font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-white/20"
@@ -602,16 +635,16 @@ const POS = () => {
                                         </div>
                                         <button
                                             onClick={() => addToCart(medicine)}
-                                            disabled={displayStock === 0}
+                                            disabled={totalTablets === 0}
                                             className={cn(
                                                 "w-full font-black uppercase tracking-widest text-[11px] py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all",
-                                                displayStock === 0
+                                                totalTablets === 0
                                                     ? "bg-white/5 text-white/20 cursor-not-allowed border border-white/5"
                                                     : "bg-[#00ff80] hover:bg-[#00e673] text-[#04110b] shadow-[0_10px_20px_rgba(0,255,128,0.1)] active:scale-95"
                                             )}
                                         >
                                             <ShoppingCart size={16} strokeWidth={3} />
-                                            {displayStock === 0 ? "Hết hàng" : "Thêm vào giỏ"}
+                                            {totalTablets === 0 ? "Hết hàng" : "Thêm vào giỏ"}
                                         </button>
                                     </div>
                                 </div>
@@ -715,12 +748,9 @@ const POS = () => {
                             <div className="space-y-4">
                                 {cart.map(item => (
                                     <div key={item.medicine_id} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-0 hover:border-white/10 transition-all group">
-                                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white/40 group-hover:text-[#00ff80] transition-colors">
-                                            {React.createElement(getIcon(item.icon), { size: 20 })}
-                                        </div>
                                         <div className="flex-1">
                                             <p className="font-bold text-white text-sm truncate">{item.name}</p>
-                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} x {formatPrice(item.price)}đ</p>
+                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} {item.unit} x {formatPrice(item.price)}đ</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}đ</p>

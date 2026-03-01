@@ -9,6 +9,8 @@ import {
     Settings
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import { cn } from '../lib/utils';
+import LiveClock from '../components/common/LiveClock';
 
 const Alerts = () => {
     return (
@@ -30,10 +32,7 @@ const Alerts = () => {
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
-                        <div className="text-right">
-                            <p className="text-sm font-black text-white leading-none">13:50:40</p>
-                            <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">Hệ thống ổn định</p>
-                        </div>
+                        <LiveClock />
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />
                         </div>

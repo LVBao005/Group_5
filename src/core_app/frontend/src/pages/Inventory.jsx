@@ -28,6 +28,7 @@ import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { inventoryService } from '../services/inventoryService';
+import LiveClock from '../components/common/LiveClock';
 
 const Inventory = () => {
     const navigate = useNavigate();
@@ -332,12 +333,7 @@ const Inventory = () => {
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-black text-white leading-none">
-                                {new Date().toLocaleTimeString('vi-VN')}
-                            </p>
-                            <p className="text-[10px] text-white/30 uppercase font-bold tracking-widest mt-1">Hôm nay</p>
-                        </div>
+                        <LiveClock className="hidden sm:block" />
                         <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
                             <User size={20} />
                         </div>
@@ -963,8 +959,8 @@ const Inventory = () => {
                                                 onChange={(e) => setImportQuantity({ ...importQuantity, unitType: e.target.value })}
                                                 className="w-full bg-[#161a19] border border-white/10 rounded-xl py-3 px-4 text-sm font-bold focus:outline-none focus:border-[#00ff80]/40 transition-all text-white appearance-none cursor-pointer"
                                             >
-                                                <option value="base">{selectedMedicineDetail.baseUnit} (Gốc)</option>
-                                                <option value="sub">{selectedMedicineDetail.subUnit} (Lẻ)</option>
+                                                <option value="base">{selectedMedicineDetail.baseUnit}</option>
+                                                <option value="sub">{selectedMedicineDetail.subUnit}</option>
                                             </select>
                                         </div>
                                         <div>
