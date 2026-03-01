@@ -22,7 +22,9 @@ public class InventoryDAO {
 
     public List<Inventory> getInventoryByBranch(int branchId) throws SQLException {
         List<Inventory> inventoryList = new ArrayList<>();
-        String sql = "SELECT i.*, m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
+        String sql = "SELECT i.inventory_id, i.branch_id, i.batch_id, i.last_updated, " +
+                "(CASE WHEN b.expiry_date < CURDATE() THEN 0 ELSE i.quantity_std END) as quantity_std, " +
+                "m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
                 "m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, " +
                 "m.category_id, c.category_name, m.medicine_id, m.brand, m.min_stock_level " +
                 "FROM inventory i " +
@@ -44,7 +46,9 @@ public class InventoryDAO {
 
     public List<Inventory> searchInventoryForPOS(int branchId, String query) throws SQLException {
         List<Inventory> results = new ArrayList<>();
-        String sql = "SELECT i.*, m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
+        String sql = "SELECT i.inventory_id, i.branch_id, i.batch_id, i.last_updated, " +
+                "(CASE WHEN b.expiry_date < CURDATE() THEN 0 ELSE i.quantity_std END) as quantity_std, " +
+                "m.name as medicine_name, b.batch_number, b.expiry_date, b.import_price_package, " +
                 "m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, " +
                 "m.category_id, c.category_name, m.medicine_id, m.brand, m.min_stock_level " +
                 "FROM inventory i " +
@@ -53,7 +57,6 @@ public class InventoryDAO {
                 "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE i.branch_id = ? " +
                 "AND (m.name LIKE ? OR m.brand LIKE ? OR b.batch_number LIKE ?) " +
-                "AND i.quantity_std > 0 " +
                 "ORDER BY b.expiry_date ASC";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -158,7 +161,7 @@ public class InventoryDAO {
                 "FROM batches b " +
                 "JOIN medicines m ON b.medicine_id = m.medicine_id " +
                 "JOIN categories c ON m.category_id = c.category_id " +
-                "WHERE b.current_total_quantity > 0 " +
+                "WHERE b.current_total_quantity > 0 AND b.expiry_date >= CURDATE() " +
                 "ORDER BY b.expiry_date ASC";
 
         try (PreparedStatement ps = connection.prepareStatement(sql);

@@ -586,7 +586,7 @@ const POS = () => {
                                     </div>
                                     <div className="flex items-baseline gap-1 mb-6">
                                         <span className="text-xl font-black text-[#00ff80] tracking-tighter">{formatPrice(displayPrice)}</span>
-                                        <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">VNĐ / {displayUnit}</span>
+                                        <span className="text-[10px] font-bold text-white/20 tracking-widest">VNĐ / {displayUnit}</span>
                                     </div>
 
                                     {/* Unit Selector - Only if sub_unit exists */}
@@ -752,7 +752,7 @@ const POS = () => {
                                     <div key={item.medicine_id} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-0 hover:border-white/10 transition-all group">
                                         <div className="flex-1">
                                             <p className="font-bold text-white text-sm truncate">{item.name}</p>
-                                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-0.5">{item.quantity} {item.unit} x {formatPrice(item.price)}đ</p>
+                                            <p className="text-[10px] text-white/30 font-bold tracking-widest mt-0.5">{item.quantity} {item.unit} x {formatPrice(item.price)}đ</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-black text-white tabular-nums tracking-tighter">{formatPrice(item.price * item.quantity)}đ</p>
@@ -949,7 +949,7 @@ const POS = () => {
                                                 <span className="text-xs font-black text-white/20 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
                                                 <div>
                                                     <p className="text-sm font-bold text-white">{item.name}</p>
-                                                    <p className="text-[10px] text-white/20 font-bold uppercase">{item.quantity} x {formatPrice(item.price)}đ</p>
+                                                    <p className="text-[10px] text-white/20 font-bold tracking-widest">{item.quantity} {item.unit} x {formatPrice(item.price)}đ</p>
                                                 </div>
                                             </div>
                                             <p className="text-sm font-black text-white tabular-nums">{formatPrice(item.price * item.quantity)} <span className="text-[10px] text-white/30 ml-1">đ</span></p>

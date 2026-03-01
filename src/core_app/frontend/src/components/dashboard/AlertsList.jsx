@@ -72,11 +72,10 @@ const AlertsList = ({ alerts }) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
-                                            severityColor === 'rose' ? 'bg-rose-500/20 text-rose-300' :
-                                            severityColor === 'amber' ? 'bg-amber-500/20 text-amber-300' :
-                                            'bg-yellow-500/20 text-yellow-300'
-                                        }`}>
+                                        <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${severityColor === 'rose' ? 'bg-rose-500/20 text-rose-300' :
+                                                severityColor === 'amber' ? 'bg-amber-500/20 text-amber-300' :
+                                                    'bg-yellow-500/20 text-yellow-300'
+                                            }`}>
                                             {item.daysUntilExpiry} ngày
                                         </div>
                                     </div>
@@ -133,11 +132,10 @@ const AlertsList = ({ alerts }) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
-                                            severityColor === 'rose' ? 'bg-rose-500/20 text-rose-300' :
-                                            severityColor === 'amber' ? 'bg-amber-500/20 text-amber-300' :
-                                            'bg-yellow-500/20 text-yellow-300'
-                                        }`}>
+                                        <div className={`px-3 py-1 rounded-full text-xs font-black ${severityColor === 'rose' ? 'bg-rose-500/20 text-rose-300' :
+                                                severityColor === 'amber' ? 'bg-amber-500/20 text-amber-300' :
+                                                    'bg-yellow-500/20 text-yellow-300'
+                                            }`}>
                                             {item.quantity} {item.unit || 'Viên'}
                                         </div>
                                     </div>

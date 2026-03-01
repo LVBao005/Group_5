@@ -127,12 +127,18 @@ public class DashboardServlet extends HttpServlet {
                 }
             }
 
-            // 3. New Medicines in Period (or Total if period is 'all')
-            StringBuilder medicinesQuery = new StringBuilder(
-                    "SELECT COUNT(DISTINCT medicine_id) as total_medicines FROM medicines ");
-            if (!"all".equals(period)) {
-                applyDateFilter(medicinesQuery, period, "created_at");
+            // 3. Unique Medicines Sold in Period (or Total in DB if 'all')
+            StringBuilder medicinesQuery = new StringBuilder();
+            if ("all".equals(period)) {
+                medicinesQuery.append("SELECT COUNT(*) as total_medicines FROM medicines ");
+            } else {
+                medicinesQuery.append("SELECT COUNT(DISTINCT b.medicine_id) as total_medicines " +
+                        "FROM invoice_details id " +
+                        "JOIN batches b ON id.batch_id = b.batch_id " +
+                        "JOIN invoices i ON id.invoice_id = i.invoice_id ");
+                applyDateFilter(medicinesQuery, period, "i.invoice_date");
             }
+
             try (PreparedStatement ps = conn.prepareStatement(medicinesQuery.toString());
                     ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
