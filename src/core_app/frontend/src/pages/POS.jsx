@@ -189,7 +189,7 @@ const POS = () => {
         const maxAvailable = selectedUnit === 'sub' ? totalTabletsStock : Math.floor(totalTabletsStock / conversionRate);
 
         setQuantities(prev => {
-            const current = prev[id] || 1;
+            const current = prev[id] ?? 0;
             const nextVal = Math.max(0, current + delta);
             return {
                 ...prev,
@@ -289,8 +289,8 @@ const POS = () => {
             [medicine.medicine_id]: prev[medicine.medicine_id] - requestedStdQty
         }));
 
-        // Reset quantity to 0
-        setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 0 }));
+        // Reset quantity to 1
+        setQuantities(prev => ({ ...prev, [medicine.medicine_id]: 1 }));
     };
 
     const removeFromCart = (item) => {
@@ -551,7 +551,7 @@ const POS = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start mb-auto">
                         {displayMedicines.map(medicine => {
                             if (!medicine) return null; // Defensive check
-                            const localQty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 0;
+                            const localQty = quantities[medicine.medicine_id] !== undefined ? quantities[medicine.medicine_id] : 1;
                             const selectedUnit = selectedUnits[medicine.medicine_id] || 'base';
                             const displayPrice = selectedUnit === 'sub' ? medicine.sub_sell_price : medicine.base_sell_price;
                             const displayUnit = selectedUnit === 'sub' ? medicine.sub_unit : medicine.base_unit;
@@ -579,7 +579,9 @@ const POS = () => {
                                                 totalTablets < (conversionRate * 2) ? "text-yellow-400" :
                                                     "text-white/50"
                                         )}>
-                                            Còn: {boxes} {medicine.base_unit}{tablets > 0 ? ` + ${tablets} ${medicine.sub_unit}` : ''}
+                                            Còn: {selectedUnit === 'sub'
+                                                ? `${totalTablets} ${medicine.sub_unit}`
+                                                : `${boxes} ${medicine.base_unit}${tablets > 0 ? ` + ${tablets} ${medicine.sub_unit}` : ''}`}
                                         </span>
                                     </div>
                                     <div className="flex items-baseline gap-1 mb-6">

@@ -43,6 +43,13 @@ const Invoices = () => {
     // Load invoices from backend
     useEffect(() => {
         loadInvoices();
+
+        // Auto-refresh every 30 seconds
+        const refreshInterval = setInterval(() => {
+            loadInvoices();
+        }, 30000);
+
+        return () => clearInterval(refreshInterval);
     }, []);
 
     // Apply filters
@@ -78,10 +85,14 @@ const Invoices = () => {
 
         // Date range filter
         if (dateFrom) {
-            filtered = filtered.filter(inv => new Date(inv.invoice_date) >= new Date(dateFrom));
+            const from = new Date(dateFrom);
+            from.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(inv => new Date(inv.invoice_date) >= from);
         }
         if (dateTo) {
-            filtered = filtered.filter(inv => new Date(inv.invoice_date) <= new Date(dateTo));
+            const to = new Date(dateTo);
+            to.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(inv => new Date(inv.invoice_date) <= to);
         }
 
         // Pharmacist filter
@@ -107,6 +118,16 @@ const Invoices = () => {
         setDateTo('');
         setPharmacistFilter('');
         setStatusFilter('all');
+    };
+
+    const setToday = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const localDate = `${year}-${month}-${day}`;
+        setDateFrom(localDate);
+        setDateTo(localDate);
     };
 
     const openInvoiceDetail = async (invoice) => {
@@ -146,6 +167,14 @@ const Invoices = () => {
                             className="w-full bg-[#1a1d1c] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#00ff80]/20 transition-all text-white"
                         />
                     </div>
+
+                    <button
+                        onClick={setToday}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#1a1d1c] border border-white/5 rounded-xl hover:border-[#00ff80]/20 transition-all text-white hover:text-[#00ff80]"
+                    >
+                        <Clock size={16} />
+                        <span className="text-xs font-bold">Hôm nay</span>
+                    </button>
 
                     <button
                         onClick={() => setShowFilters(!showFilters)}
