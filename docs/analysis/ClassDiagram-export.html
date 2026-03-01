@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Class Diagram - Backend</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #333; text-align: center; }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 1800px;
+        }
+        .instruction {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ CLASS DIAGRAM - Backend MVC</h1>
+        <div class="instruction">
+            <strong>Hướng dẫn lưu PNG:</strong> Click chuột phải vào sơ đồ → "Save image as..." → Lưu thành <code>Class-Diagram-Backend.png</code>
+        </div>
+        <div class="mermaid">
+classDiagram
+    class LoginServlet {
+        <<Controller>>
+        - pharmacistDAO: PharmacistDAO
+        - gson: Gson
+        + doPost(request, response)
+        + handleLogin()
+        + handleLogout()
+    }
+
+    class MedicineServlet {
+        <<Controller>>
+        - medicineDAO: MedicineDAO
+        + doGet(request, response)
+        + doPost(request, response)
+    }
+
+    class InventoryServlet {
+        <<Controller>>
+        - inventoryDAO: InventoryDAO
+        + doGet(request, response)
+        + doPost(request, response)
+    }
+
+    class InvoiceServlet {
+        <<Controller>>
+        - invoiceDAO: InvoiceDAO
+        - saleService: SaleService
+        + doGet(request, response)
+        + doPost(request, response)
+    }
+
+    class AuthService {
+        <<Service>>
+        - pharmacistDAO: PharmacistDAO
+        + authenticate(username, password)
+    }
+
+    class SaleService {
+        <<Service>>
+        - invoiceDetailDAO: InvoiceDetailDAO
+        - inventoryDAO: InventoryDAO
+        + processSaleItem(branchId, detail)
+    }
+
+    class MedicineDAO {
+        <<DAO>>
+        - connection: Connection
+        + getAllMedicines()
+        + getMedicineById(id)
+        + insertMedicine(medicine)
+    }
+
+    class BatchDAO {
+        <<DAO>>
+        - connection: Connection
+        + getAllBatches()
+        + updateQuantity(batchId, qty)
+    }
+
+    class InventoryDAO {
+        <<DAO>>
+        - connection: Connection
+        + getInventoryByBranch(branchId)
+        + updateBatchQuantity(branchId, batchId, qty)
+    }
+
+    class InvoiceDAO {
+        <<DAO>>
+        - connection: Connection
+        + getAllInvoices()
+        + createInvoice(invoice)
+    }
+
+    class InvoiceDetailDAO {
+        <<DAO>>
+        - connection: Connection
+        + insertDetail(detail)
+    }
+
+    class PharmacistDAO {
+        <<DAO>>
+        - connection: Connection
+        + authenticate(username, password)
+        + findByUsername(username)
+    }
+
+    class Medicine {
+        <<Model>>
+        - medicineId: int
+        - name: String
+        - baseSellPrice: double
+        + getMedicineId()
+        + setName(name)
+    }
+
+    class Batch {
+        <<Model>>
+        - batchId: int
+        - medicineId: int
+        - expiryDate: Date
+        + getBatchId()
+    }
+
+    class Inventory {
+        <<Model>>
+        - inventoryId: int
+        - branchId: int
+        - quantityStd: int
+        + getQuantityStd()
+    }
+
+    class Invoice {
+        <<Model>>
+        - invoiceId: int
+        - totalAmount: double
+        + calculateTotal()
+    }
+
+    class InvoiceDetail {
+        <<Model>>
+        - detailId: int
+        - invoiceId: int
+        - quantitySold: int
+        + getTotalPrice()
+    }
+
+    class Pharmacist {
+        <<Model>>
+        - pharmacistId: int
+        - username: String
+        - role: String
+        + isAdmin()
+    }
+
+    class DBContext {
+        <<Utility>>
+        + getConnection()
+    }
+
+    LoginServlet --> AuthService
+    InvoiceServlet --> SaleService
+    MedicineServlet --> MedicineDAO
+    InventoryServlet --> InventoryDAO
+    InvoiceServlet --> InvoiceDAO
+    LoginServlet --> PharmacistDAO
+    
+    AuthService --> PharmacistDAO
+    SaleService --> InvoiceDetailDAO
+    SaleService --> InventoryDAO
+    
+    MedicineDAO ..> Medicine
+    BatchDAO ..> Batch
+    InventoryDAO ..> Inventory
+    InvoiceDAO ..> Invoice
+    InvoiceDetailDAO ..> InvoiceDetail
+    PharmacistDAO ..> Pharmacist
+    
+    MedicineDAO --> DBContext
+    BatchDAO --> DBContext
+    InventoryDAO --> DBContext
+    InvoiceDAO --> DBContext
+    InvoiceDetailDAO --> DBContext
+    PharmacistDAO --> DBContext
+        </div>
+    </div>
+</body>
+</html>
