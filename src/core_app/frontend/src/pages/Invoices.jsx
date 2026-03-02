@@ -392,6 +392,29 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
 
 // Invoice Detail Modal Component
 const InvoiceDetailModal = ({ invoice, onClose }) => {
+    // Group details by medicine and unit to consolidate split batches for customer view
+    const consolidatedDetails = React.useMemo(() => {
+        if (!invoice?.details) return [];
+
+        const groups = {};
+        invoice.details.forEach(item => {
+            // Group by medicine (id or name) and unit
+            const key = `${item.medicine_id || item.medicine_name}-${item.unit_sold}`;
+            if (!groups[key]) {
+                groups[key] = {
+                    ...item,
+                    total_quantity: 0,
+                    batch_ids: []
+                };
+            }
+            groups[key].total_quantity += item.quantity_sold;
+            if (item.batch_id && !groups[key].batch_ids.includes(item.batch_id)) {
+                groups[key].batch_ids.push(item.batch_id);
+            }
+        });
+        return Object.values(groups);
+    }, [invoice.details]);
+
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-[#161a19] border border-white/10 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -443,21 +466,25 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {invoice.details && invoice.details.length > 0 ? (
-                                        invoice.details.map((item, index) => (
+                                    {consolidatedDetails.length > 0 ? (
+                                        consolidatedDetails.map((item, index) => (
                                             <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                                 <td className="px-4 py-4 text-sm text-white font-bold">{item.medicine_name || 'N/A'}</td>
                                                 <td className="px-4 py-4 text-center">
-                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#00ff80]/10 text-[#00ff80] border border-[#00ff80]/20">
-                                                        <Tag size={12} />
-                                                        Lô #{item.batch_id}
-                                                    </span>
+                                                    <div className="flex flex-wrap justify-center gap-1">
+                                                        {item.batch_ids.map(batchId => (
+                                                            <span key={batchId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#00ff80]/10 text-[#00ff80] border border-[#00ff80]/20">
+                                                                <Tag size={10} />
+                                                                #{batchId}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-white/60 text-center">{item.unit_sold}</td>
-                                                <td className="px-4 py-4 text-sm text-white text-center font-bold">{item.quantity_sold}</td>
+                                                <td className="px-4 py-4 text-sm text-white text-center font-bold">{item.total_quantity}</td>
                                                 <td className="px-4 py-4 text-sm text-white/60 text-right tabular-nums">{formatCurrency(item.unit_price)}</td>
                                                 <td className="px-4 py-4 text-sm text-white font-bold text-right tabular-nums">
-                                                    {formatCurrency(item.unit_price * item.quantity_sold)}
+                                                    {formatCurrency(item.unit_price * item.total_quantity)}
                                                 </td>
                                             </tr>
                                         ))
@@ -472,6 +499,7 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                             </table>
                         </div>
                     </div>
+
 
                     {/* Total */}
                     <div className="flex justify-end">

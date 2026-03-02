@@ -2,6 +2,7 @@ package com.pharmacy.simulator;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.pharmacy.simulator.model.*;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -17,344 +18,244 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Random;
-import java.util.Scanner;
 
 /**
  * POS Simulator - Simulates continuous checkout requests to pharmacy backend
- * 
- * This application continuously:
- * 1. Fetches available inventory from the API
- * 2. Randomly selects a medicine and quantity (1-5)
- * 3. Sends a checkout request to the backend
- * 4. Sleeps for 2-3 seconds between requests
- * 
- * Purpose: Demonstrate real-time inventory deduction in the database
+ * Project B - Client acting as a customer/pharmacist
  */
 public class PosSimulator {
-    
-    // Configuration
-    private static final String DEFAULT_BASE_URL = "http://localhost:8080/backend";
-    private static final int DEFAULT_BRANCH_ID = 1;
-    private static final int DEFAULT_PHARMACIST_ID = 1;
-    private static final int MIN_QUANTITY = 1;
-    private static final int MAX_QUANTITY = 5;
-    private static final int MIN_SLEEP_MS = 2000;
-    private static final int MAX_SLEEP_MS = 3000;
-    
-    private final String baseUrl;
-    private final int branchId;
-    private final int pharmacistId;
+
+    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final Gson gson;
     private final Random random;
     private final CloseableHttpClient httpClient;
-    private final DateTimeFormatter dateFormatter;
-    
+
+    private int pharmacistId = 1; // Default
     private int successCount = 0;
     private int errorCount = 0;
     private int requestCount = 0;
-    
-    public PosSimulator(String baseUrl, int branchId, int pharmacistId) {
-        this.baseUrl = baseUrl;
-        this.branchId = branchId;
-        this.pharmacistId = pharmacistId;
+
+    public PosSimulator() {
         this.gson = new GsonBuilder()
                 .setPrettyPrinting()
                 .create();
         this.random = new Random();
         this.httpClient = HttpClients.createDefault();
-        this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     }
-    
+
+    /**
+     * Thực hiện đăng nhập để lấy thông tin dược sĩ
+     */
+    private boolean login() {
+        logInfo("Đang đăng nhập với tài khoản: " + SimulatorConfig.USERNAME);
+        try {
+            HttpPost request = new HttpPost(SimulatorConfig.BASE_URL + "/api/login");
+            JsonObject loginData = new JsonObject();
+            loginData.addProperty("username", SimulatorConfig.USERNAME);
+            loginData.addProperty("password", SimulatorConfig.PASSWORD);
+
+            request.setEntity(new StringEntity(gson.toJson(loginData), ContentType.APPLICATION_JSON));
+
+            try (ClassicHttpResponse response = httpClient.executeOpen(null, request, null)) {
+                String jsonResponse = EntityUtils.toString(response.getEntity());
+
+                if (response.getCode() == 200) {
+                    JsonObject result = gson.fromJson(jsonResponse, JsonObject.class);
+                    if (result.get("success").getAsBoolean()) {
+                        JsonObject user = result.getAsJsonObject("user");
+                        // The backend field is pharmacist_id (snake_case)
+                        this.pharmacistId = user.get("pharmacist_id").getAsInt();
+                        logSuccess("Đăng nhập thành công! Pharmacist ID: " + this.pharmacistId);
+                        return true;
+                    }
+                }
+                logError("Đăng nhập thất bại. Kiểm tra lại SimulatorConfig.java. Status: " + response.getCode());
+                return false;
+            }
+        } catch (Exception e) {
+            logError("Lỗi kết nối khi đăng nhập: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Main simulation loop
      */
     public void start() {
         System.out.println("═══════════════════════════════════════════════════════════════");
-        System.out.println("   PHARMACY POS SIMULATOR - STARTING");
+        System.out.println("   PHARMACY POS SIMULATOR - STARTING (PROJECT B)");
         System.out.println("═══════════════════════════════════════════════════════════════");
-        System.out.println("Backend URL:    " + baseUrl);
-        System.out.println("Branch ID:      " + branchId);
-        System.out.println("Pharmacist ID:  " + pharmacistId);
+        System.out.println("Backend URL:    " + SimulatorConfig.BASE_URL);
+        System.out.println("Branch ID:      " + SimulatorConfig.BRANCH_ID);
+        System.out.println("Max Quantity:   " + SimulatorConfig.MAX_QUANTITY);
+        System.out.println("Delay Seconds:  " + SimulatorConfig.DELAY_SECONDS);
         System.out.println("═══════════════════════════════════════════════════════════════");
-        System.out.println("Simulator will continuously send checkout requests...");
-        System.out.println("Press Ctrl+C to stop\n");
-        
+
+        // Bước 1: Đăng nhập
+        if (!login()) {
+            System.err.println("Dừng simulator do không thể đăng nhập.");
+            return;
+        }
+
+        System.out.println("Simulator sẽ bắt đầu gửi yêu cầu liên tục...");
+        System.out.println("Nhấn Ctrl+C để dừng\n");
+
         // Main simulation loop
         while (true) {
             try {
                 requestCount++;
                 logInfo("═══ Request #" + requestCount + " ═══");
-                
-                // Step 1: Fetch available inventory
+
+                // Bước 2: Lấy danh sách thuốc hiện có
                 InventoryItem[] inventory = fetchInventory();
-                
+
                 if (inventory == null || inventory.length == 0) {
-                    logWarning("No inventory available. Waiting 5 seconds...");
+                    logWarning("Không có thuốc trong kho. Đang đợi 5 giây...");
                     Thread.sleep(5000);
                     continue;
                 }
-                
-                // Step 2: Randomly select a medicine
+
+                // Bước 3: Chọn ngẫu nhiên 1 loại thuốc
                 InventoryItem selectedItem = inventory[random.nextInt(inventory.length)];
-                
-                // Step 3: Randomly select quantity (1-5 or max available)
-                int maxQuantity = Math.min(MAX_QUANTITY, selectedItem.getQuantityStd());
-                if (maxQuantity < MIN_QUANTITY) {
-                    logWarning("Selected item has insufficient stock: " + selectedItem.getMedicineName());
+
+                // Bước 4: Chọn số lượng ngẫu nhiên (1 tới MAX_QUANTITY)
+                int maxAvailable = Math.min(SimulatorConfig.MAX_QUANTITY, selectedItem.getQuantityStd());
+                if (maxAvailable < 1) {
+                    logWarning("Thuốc đã chọn hết hàng: " + selectedItem.getMedicineName());
                     continue;
                 }
-                int quantity = random.nextInt(maxQuantity - MIN_QUANTITY + 1) + MIN_QUANTITY;
-                
-                // Step 4: Send checkout request
+                int quantity = random.nextInt(maxAvailable) + 1;
+
+                // Bước 5: Thanh toán và tạo hóa đơn
                 boolean success = sendCheckoutRequest(selectedItem, quantity);
-                
+
                 if (success) {
                     successCount++;
                 } else {
                     errorCount++;
                 }
-                
-                // Display statistics
-                logInfo(String.format("Statistics: Success=%d, Error=%d, Total=%d", 
-                    successCount, errorCount, requestCount));
-                
-                // Step 5: Sleep for 2-3 seconds
-                int sleepTime = random.nextInt(MAX_SLEEP_MS - MIN_SLEEP_MS + 1) + MIN_SLEEP_MS;
+
+                // Hiển thị thống kê
+                logInfo(String.format("Thống kê: Thành công=%d, Lỗi=%d, Tổng=%d",
+                        successCount, errorCount, requestCount));
+
+                // Bước 6: Nghỉ theo cài đặt
                 System.out.println();
-                Thread.sleep(sleepTime);
-                
+                Thread.sleep(SimulatorConfig.DELAY_SECONDS * 1000L);
+
             } catch (InterruptedException e) {
-                logError("Simulator interrupted. Shutting down...");
+                logError("Dừng simulator đột ngột.");
                 break;
             } catch (Exception e) {
-                logError("Unexpected error: " + e.getMessage());
-                e.printStackTrace();
+                logError("Lỗi không mong muốn: " + e.getMessage());
                 try {
-                    Thread.sleep(3000); // Wait before retrying
+                    Thread.sleep(3000);
                 } catch (InterruptedException ie) {
                     break;
                 }
             }
         }
-        
+
         cleanup();
     }
-    
+
     /**
-     * Fetch available inventory from API
+     * Lấy danh sách tồn kho từ API
      */
     private InventoryItem[] fetchInventory() {
         try {
-            String url = baseUrl + "/api/inventory?branchId=" + branchId;
+            String url = SimulatorConfig.BASE_URL + "/api/inventory?branchId=" + SimulatorConfig.BRANCH_ID;
             HttpGet request = new HttpGet(url);
-            
+
             try (ClassicHttpResponse response = httpClient.executeOpen(null, request, null)) {
                 String jsonResponse = EntityUtils.toString(response.getEntity());
-                
+
                 if (response.getCode() != 200) {
-                    logError("Failed to fetch inventory. Status: " + response.getCode());
+                    logError("Không thể lấy danh sách kho. Status: " + response.getCode());
                     return null;
                 }
-                
+
                 InventoryResponse inventoryResponse = gson.fromJson(jsonResponse, InventoryResponse.class);
-                
-                if (!inventoryResponse.isSuccess()) {
-                    logError("Inventory API returned error: " + inventoryResponse.getError());
-                    return null;
-                }
-                
-                logSuccess("Fetched " + inventoryResponse.getData().length + " inventory items");
+                logSuccess("Đã lấy " + inventoryResponse.getData().length + " mặt hàng từ kho");
                 return inventoryResponse.getData();
             }
-            
+
         } catch (IOException | ParseException e) {
-            logError("Network error while fetching inventory: " + e.getMessage());
+            logError("Lỗi mạng khi lấy kho: " + e.getMessage());
             return null;
         }
     }
-    
+
     /**
-     * Send checkout request to API
+     * Gửi yêu cầu thanh toán
      */
     private boolean sendCheckoutRequest(InventoryItem item, int quantity) {
         try {
-            // Determine unit and calculate total standard quantity
             String unitSold = item.getSubUnit() != null ? item.getSubUnit() : item.getBaseUnit();
             double unitPrice = item.getSubUnit() != null ? item.getSubSellPrice() : item.getBaseSellPrice();
-            int totalStdQuantity = quantity; // Assuming we're selling in sub units (smallest unit)
-            
-            // Create checkout request
+
             CheckoutRequest checkoutRequest = new CheckoutRequest();
-            checkoutRequest.setBranchId(branchId);
-            checkoutRequest.setPharmacistId(pharmacistId);
+            checkoutRequest.setBranchId(SimulatorConfig.BRANCH_ID);
+            checkoutRequest.setPharmacistId(this.pharmacistId);
             checkoutRequest.setSimulated(true);
-            
+
             InvoiceDetailRequest detail = new InvoiceDetailRequest(
-                item.getBatchId(),
-                unitSold,
-                quantity,
-                unitPrice,
-                totalStdQuantity
-            );
+                    item.getBatchId(), unitSold, quantity, unitPrice, quantity);
             checkoutRequest.addDetail(detail);
             checkoutRequest.calculateTotalAmount();
-            
-            // Convert to JSON
-            String jsonRequest = gson.toJson(checkoutRequest);
-            
-            // Log request details
-            logInfo(String.format("Checkout: %s x%d @ %.2f = %.2f VNĐ",
-                item.getMedicineName(), quantity, unitPrice, checkoutRequest.getTotalAmount()));
-            
-            // Send POST request
-            String url = baseUrl + "/api/invoices";
-            HttpPost request = new HttpPost(url);
-            request.setEntity(new StringEntity(jsonRequest, ContentType.APPLICATION_JSON));
-            
+
+            logInfo(String.format("Thanh toán: %s x%d = %.2f VNĐ",
+                    item.getMedicineName(), quantity, checkoutRequest.getTotalAmount()));
+
+            HttpPost request = new HttpPost(SimulatorConfig.BASE_URL + "/api/invoices");
+            request.setEntity(new StringEntity(gson.toJson(checkoutRequest), ContentType.APPLICATION_JSON));
+
             try (ClassicHttpResponse response = httpClient.executeOpen(null, request, null)) {
                 String jsonResponse = EntityUtils.toString(response.getEntity());
-                
                 if (response.getCode() == 201 || response.getCode() == 200) {
-                    CheckoutResponse checkoutResponse = gson.fromJson(jsonResponse, CheckoutResponse.class);
-                    
-                    if (checkoutResponse.isSuccess()) {
-                        logSuccess("Invoice created successfully! ID: " + checkoutResponse.getInvoiceId());
+                    CheckoutResponse res = gson.fromJson(jsonResponse, CheckoutResponse.class);
+                    if (res.isSuccess()) {
+                        logSuccess("Tạo hóa đơn thành công! ID: " + res.getInvoiceId());
                         return true;
-                    } else {
-                        logError("Checkout failed: " + checkoutResponse.getMessage());
-                        return false;
                     }
-                } else {
-                    logError("Checkout request failed. Status: " + response.getCode());
-                    logError("Response: " + jsonResponse);
-                    return false;
                 }
+                logError("Thanh toán thất bại. Status: " + response.getCode() + " Response: " + jsonResponse);
+                return false;
             }
-            
-        } catch (IOException | ParseException e) {
-            logError("Network error during checkout: " + e.getMessage());
-            return false;
         } catch (Exception e) {
-            logError("Error processing checkout: " + e.getMessage());
+            logError("Lỗi khi xử lý thanh toán: " + e.getMessage());
             return false;
         }
     }
-    
-    /**
-     * Clean up resources
-     */
+
     private void cleanup() {
         try {
-            if (httpClient != null) {
+            if (httpClient != null)
                 httpClient.close();
-            }
         } catch (IOException e) {
-            logError("Error closing HTTP client: " + e.getMessage());
         }
-        
         System.out.println("\n═══════════════════════════════════════════════════════════════");
         System.out.println("   PHARMACY POS SIMULATOR - STOPPED");
         System.out.println("═══════════════════════════════════════════════════════════════");
-        System.out.println("Final Statistics:");
-        System.out.println("  Total Requests:  " + requestCount);
-        System.out.println("  Successful:      " + successCount);
-        System.out.println("  Errors:          " + errorCount);
-        System.out.println("═══════════════════════════════════════════════════════════════");
     }
-    
-    // Logging methods
+
     private void logInfo(String message) {
-        System.out.println("[" + getCurrentTime() + "] [INFO] " + message);
+        System.out.println("[" + LocalDateTime.now().format(dateFormatter) + "] [INFO] " + message);
     }
-    
+
     private void logSuccess(String message) {
-        System.out.println("[" + getCurrentTime() + "] [✓] " + message);
+        System.out.println("[" + LocalDateTime.now().format(dateFormatter) + "] [✓] " + message);
     }
-    
+
     private void logWarning(String message) {
-        System.out.println("[" + getCurrentTime() + "] [⚠] " + message);
+        System.out.println("[" + LocalDateTime.now().format(dateFormatter) + "] [⚠] " + message);
     }
-    
+
     private void logError(String message) {
-        System.err.println("[" + getCurrentTime() + "] [✗] " + message);
+        System.err.println("[" + LocalDateTime.now().format(dateFormatter) + "] [✗] " + message);
     }
-    
-    private String getCurrentTime() {
-        return LocalDateTime.now().format(dateFormatter);
-    }
-    
-    /**
-     * Main entry point
-     */
+
     public static void main(String[] args) {
-        // Parse command line arguments or use defaults
-        String baseUrl = DEFAULT_BASE_URL;
-        int branchId = DEFAULT_BRANCH_ID;
-        int pharmacistId = DEFAULT_PHARMACIST_ID;
-        
-        // Check for command line arguments
-        if (args.length > 0) {
-            baseUrl = args[0];
-        }
-        if (args.length > 1) {
-            try {
-                branchId = Integer.parseInt(args[1]);
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid branch ID. Using default: " + DEFAULT_BRANCH_ID);
-            }
-        }
-        if (args.length > 2) {
-            try {
-                pharmacistId = Integer.parseInt(args[2]);
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid pharmacist ID. Using default: " + DEFAULT_PHARMACIST_ID);
-            }
-        }
-        
-        // Interactive mode if no arguments provided
-        if (args.length == 0) {
-            try (Scanner scanner = new Scanner(System.in)) {
-                System.out.println("═══════════════════════════════════════════════════════════════");
-                System.out.println("   PHARMACY POS SIMULATOR - CONFIGURATION");
-                System.out.println("═══════════════════════════════════════════════════════════════");
-                
-                System.out.print("Enter Backend URL [" + DEFAULT_BASE_URL + "]: ");
-                String input = scanner.nextLine().trim();
-                if (!input.isEmpty()) {
-                    baseUrl = input;
-                }
-                
-                System.out.print("Enter Branch ID [" + DEFAULT_BRANCH_ID + "]: ");
-                input = scanner.nextLine().trim();
-                if (!input.isEmpty()) {
-                    try {
-                        branchId = Integer.parseInt(input);
-                    } catch (NumberFormatException e) {
-                        System.out.println("Invalid input. Using default: " + DEFAULT_BRANCH_ID);
-                    }
-                }
-                
-                System.out.print("Enter Pharmacist ID [" + DEFAULT_PHARMACIST_ID + "]: ");
-                input = scanner.nextLine().trim();
-                if (!input.isEmpty()) {
-                    try {
-                        pharmacistId = Integer.parseInt(input);
-                    } catch (NumberFormatException e) {
-                        System.out.println("Invalid input. Using default: " + DEFAULT_PHARMACIST_ID);
-                    }
-                }
-                
-                System.out.println();
-            }
-        }
-        
-        // Create and start simulator
-        PosSimulator simulator = new PosSimulator(baseUrl, branchId, pharmacistId);
-        
-        // Add shutdown hook for graceful shutdown
-        Runtime.getRuntime().addShutdownHook(new Thread(simulator::cleanup));
-        
-        // Start simulation
-        simulator.start();
+        new PosSimulator().start();
     }
 }

@@ -409,85 +409,90 @@ const POS = () => {
             return;
         }
 
-        // Process cart allocations (FIFO)
-        const detailsPayload = [];
+        try {
+            const invoiceDetails = [];
 
-        for (const item of cart) {
-            const medicine = medicines.find(m => m.medicine_id === item.medicine_id);
-            if (!medicine) continue;
+            // Create a deep copy of medicines to track deductions across all cart items accurately
+            const currentMedicinesMap = JSON.parse(JSON.stringify(medicines));
 
-            let remainingQty = item.quantity;
-            let allocated = 0;
+            for (const item of cart) {
+                const medicine = currentMedicinesMap.find(m => m.medicine_id === item.medicine_id);
+                if (!medicine) continue;
 
-            // Batches are already sorted by expiry in 'medicines' state
-            for (const batch of medicine.batches) {
-                if (remainingQty <= 0) break;
+                const conversionRate = medicine.conversion_rate || 1;
+                const isSub = item.is_sub;
+                let remainingStdQty = isSub ? item.quantity : (item.quantity * conversionRate);
 
-                const take = Math.min(remainingQty, batch.quantity_std);
-                if (take > 0) {
-                    detailsPayload.push({
-                        batch_id: batch.batch_id,
-                        unit_sold: item.base_unit,
-                        quantity_sold: take,
-                        unit_price: item.price,
-                        total_std_quantity: take * (item.conversion_rate || 1) // Assuming selling base unit
-                    });
-                    remainingQty -= take;
-                    allocated += take;
+                for (const batch of medicine.batches) {
+                    if (remainingStdQty <= 0) break;
+                    if (batch.quantity_std <= 0) continue;
+
+                    const takeStd = Math.min(remainingStdQty, batch.quantity_std);
+
+                    if (takeStd > 0) {
+                        let unitSold = item.unit;
+                        let quantitySold = 0;
+                        let unitPrice = 0;
+
+                        if (isSub) {
+                            quantitySold = takeStd;
+                            unitSold = medicine.sub_unit;
+                            unitPrice = medicine.sub_sell_price;
+                        } else {
+                            if (takeStd % conversionRate === 0) {
+                                quantitySold = takeStd / conversionRate;
+                                unitSold = medicine.base_unit;
+                                unitPrice = medicine.base_sell_price;
+                            } else {
+                                quantitySold = takeStd;
+                                unitSold = medicine.sub_unit;
+                                unitPrice = medicine.base_sell_price / conversionRate;
+                            }
+                        }
+
+                        invoiceDetails.push({
+                            batch_id: batch.batch_id,
+                            unit_sold: unitSold,
+                            quantity_sold: Math.round(quantitySold),
+                            unit_price: unitPrice,
+                            total_std_quantity: Math.round(takeStd)
+                        });
+
+                        batch.quantity_std -= takeStd;
+                        remainingStdQty -= takeStd;
+                    }
+                }
+
+                if (remainingStdQty > 0) {
+                    throw new Error(`Thuốc ${item.name} không đủ tồn kho để thực hiện giao dịch này! (Thiếu ${remainingStdQty} viên)`);
                 }
             }
 
-            if (remainingQty > 0) {
-                alert(`Lỗi: Thuốc ${item.name} không đủ tồn kho để thực hiện giao dịch này! (Thiếu ${remainingQty})`);
-                setLoading(false);
-                return;
-            }
-        }
+            const payload = {
+                branch_id: user?.branch_id || 1,
+                pharmacist_id: parseInt(localStorage.getItem('pharmacistId')) || user?.pharmacist_id || 1,
+                customer_phone: phone || null,
+                customer_name: customerName || null,
+                total_amount: finalAmount,
+                is_simulated: false,
+                details: invoiceDetails,
+                points_used: pointsToUse,
+                points_earned: Math.floor(finalAmount / 10)
+            };
 
-        // Construct SQL-aligned payload
-        const pointsEarned = Math.floor(finalAmount / 10);
-
-        const payload = {
-            branch_id: user?.branch_id || 1,
-            pharmacist_id: user?.pharmacist_id || 1,
-            customer_phone: phone || null, // Send phone number to backend
-            customer_name: customerName || null, // Send customer name to backend
-            total_amount: finalAmount, // send final amount after discount
-            is_simulated: false, // Real sale from POS
-            details: detailsPayload,
-            points_used: pointsToUse,
-            points_earned: pointsEarned
-        };
-
-        console.log('💰 Creating invoice with payload:', payload);
-
-        try {
-            // Call the API service
             const response = await invoiceService.createInvoice(payload);
-            console.log('✅ Invoice created successfully:', response);
-
-            // Success feedback
             setSuccess(true);
             setTimeout(() => {
                 setCart([]);
-                setShowInvoice(false);
-                setSuccess(false);
                 setPhone('');
                 setCustomerName('');
-                setIsOldCustomer(false);
-                setCustomerPoints(0);
-                setShowNameInput(false);
-                setUsePoints(false);
                 setPointsToUse(0);
-                setLoading(false);
-
-                // Reload inventory data to refresh stock
                 window.location.reload();
-            }, 1500);
+            }, 1000);
         } catch (error) {
             console.error('❌ API Error:', error);
-            console.error('Error details:', error.response?.data || error.message);
-            alert(`Lỗi khi đẩy dữ liệu xuống Backend!\n${error.response?.data?.error || error.message}\n(Kiểm tra Console để biết thêm chi tiết)`);
+            alert("Thanh toán thất bại: " + (error.response?.data?.error || error.message));
+        } finally {
             setLoading(false);
         }
     };
@@ -749,7 +754,7 @@ const POS = () => {
                         ) : (
                             <div className="space-y-4">
                                 {cart.map(item => (
-                                    <div key={item.medicine_id} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-0 hover:border-white/10 transition-all group">
+                                    <div key={`${item.medicine_id}-${item.unit}`} className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 flex items-center gap-0 hover:border-white/10 transition-all group">
                                         <div className="flex-1">
                                             <p className="font-bold text-white text-sm truncate">{item.name}</p>
                                             <p className="text-[10px] text-white/30 font-bold tracking-widest mt-0.5">{item.quantity} {item.unit} x {formatPrice(item.price)}đ</p>

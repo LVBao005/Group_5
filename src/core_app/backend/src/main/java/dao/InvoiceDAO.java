@@ -10,7 +10,9 @@ import utils.DBContext;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * DAO for Invoice operations
@@ -123,14 +125,9 @@ public class InvoiceDAO {
                     + "VALUES (?, ?, ?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
-            // Check stock availability and prepare statements
-            String sqlCheckInventory = "SELECT quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ?";
-            PreparedStatement psCheckInventory = conn.prepareStatement(sqlCheckInventory);
-
-            // Update inventory (quantity_std per branch) - CHỈ cập nhật inventory tại chi
-            // nhánh
-            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ? AND quantity_std >= ?";
-            psUpdateInventory = conn.prepareStatement(sqlUpdateInventory);
+            // Consolidation Map for inventory updates to prevent 500 errors (Duplicate
+            // batch updates)
+            Map<Integer, Integer> batchInventoryDeductions = new HashMap<>();
 
             for (JsonElement detailElement : details) {
                 JsonObject detail = detailElement.getAsJsonObject();
@@ -141,23 +138,11 @@ public class InvoiceDAO {
                 double unitPrice = detail.get("unit_price").getAsDouble();
                 int totalStdQuantity = detail.get("total_std_quantity").getAsInt();
 
-                // Check stock availability at branch
-                psCheckInventory.setInt(1, batchId);
-                psCheckInventory.setInt(2, branchId);
-                ResultSet rsStock = psCheckInventory.executeQuery();
+                // Collect for consolidated inventory update
+                batchInventoryDeductions.put(batchId,
+                        batchInventoryDeductions.getOrDefault(batchId, 0) + totalStdQuantity);
 
-                int availableStock = 0;
-                if (rsStock.next()) {
-                    availableStock = rsStock.getInt("quantity_std");
-                }
-                rsStock.close();
-
-                if (availableStock < totalStdQuantity) {
-                    throw new SQLException("Không đủ số lượng tồn kho. Batch ID: " + batchId +
-                            ", Cần: " + totalStdQuantity + ", Còn lại: " + availableStock);
-                }
-
-                // Insert detail
+                // Insert detail (preserve individual rows for invoice history)
                 psDetail.setInt(1, invoiceId);
                 psDetail.setInt(2, batchId);
                 psDetail.setString(3, unitSold);
@@ -165,28 +150,49 @@ public class InvoiceDAO {
                 psDetail.setDouble(5, unitPrice);
                 psDetail.setInt(6, totalStdQuantity);
                 psDetail.addBatch();
-
-                // Update inventory (deduct stock at branch level)
-                psUpdateInventory.setInt(1, totalStdQuantity);
-                psUpdateInventory.setInt(2, batchId);
-                psUpdateInventory.setInt(3, branchId);
-                psUpdateInventory.setInt(4, totalStdQuantity); // Safety check
-                psUpdateInventory.addBatch();
             }
 
             psDetail.executeBatch();
 
-            int[] inventoryResults = psUpdateInventory.executeBatch();
+            // Perform consolidated inventory updates (Once per Batch ID)
+            String sqlCheckInventory = "SELECT quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ? FOR UPDATE";
+            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ? AND quantity_std >= ?";
 
-            // Verify all inventory updates succeeded
-            for (int i = 0; i < inventoryResults.length; i++) {
-                if (inventoryResults[i] == 0) {
-                    throw new SQLException(
-                            "Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này.");
+            try (PreparedStatement psCheck = conn.prepareStatement(sqlCheckInventory);
+                    PreparedStatement psUpdate = conn.prepareStatement(sqlUpdateInventory)) {
+
+                for (Map.Entry<Integer, Integer> entry : batchInventoryDeductions.entrySet()) {
+                    int batchId = entry.getKey();
+                    int totalNeeded = entry.getValue();
+
+                    // 1. Check aggregate stock availability at branch
+                    psCheck.setInt(1, batchId);
+                    psCheck.setInt(2, branchId);
+                    try (ResultSet rsStock = psCheck.executeQuery()) {
+                        int availableStock = 0;
+                        if (rsStock.next()) {
+                            availableStock = rsStock.getInt("quantity_std");
+                        }
+                        if (availableStock < totalNeeded) {
+                            throw new SQLException(
+                                    "Không đủ số lượng tồn kho tổng cộng cho lô hàng. Batch ID: " + batchId +
+                                            ", Cần: " + totalNeeded + ", Còn lại: " + availableStock);
+                        }
+                    }
+
+                    // 2. Perform consolidated update
+                    psUpdate.setInt(1, totalNeeded);
+                    psUpdate.setInt(2, batchId);
+                    psUpdate.setInt(3, branchId);
+                    psUpdate.setInt(4, totalNeeded); // Safety check for concurrent updates
+
+                    if (psUpdate.executeUpdate() == 0) {
+                        throw new SQLException(
+                                "Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này. Batch ID: "
+                                        + batchId);
+                    }
                 }
             }
-
-            psCheckInventory.close();
 
             conn.commit(); // Commit transaction
 
