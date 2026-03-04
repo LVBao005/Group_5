@@ -921,7 +921,7 @@ const POS = () => {
                                             <User size={16} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-black text-white">{user?.fullName || user?.pharmacist_name || 'BẢO'}</p>
+                                            <p className="text-sm font-black text-white">{user?.full_name || user?.fullName || user?.username || 'N/A'}</p>
                                             <p className="text-[10px] text-[#00ff80] font-black uppercase">Pharmacist</p>
                                         </div>
                                     </div>
@@ -967,7 +967,23 @@ const POS = () => {
                         {/* Footer */}
                         <div className="p-10 bg-[#0d0f0e]/50 border-t border-white/5">
                             <div className="flex flex-col gap-4">
-                                <div className="flex justify-between items-center px-2">
+                                {pointsToUse > 0 && (
+                                    <>
+                                        <div className="flex justify-between items-center px-2">
+                                            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Tạm tính</span>
+                                            <span className="text-xl font-black text-white/60 tabular-nums">
+                                                {formatPrice(totalAmount)} <span className="text-[10px] ml-1">đ</span>
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center px-2">
+                                            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Sử dụng điểm</span>
+                                            <span className="text-xl font-black text-orange-500 tabular-nums">
+                                                -{formatPrice(pointsToUse)} <span className="text-[10px] ml-1">đ</span>
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+                                <div className={cn("flex justify-between items-center px-2", pointsToUse > 0 && "pt-4 border-t border-white/5")}>
                                     <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Cần thanh toán</span>
                                     <span className="text-4xl font-black text-[#00ff80] tracking-tighter tabular-nums">
                                         {formatPrice(finalAmount)} <span className="text-xs ml-1">đ</span>

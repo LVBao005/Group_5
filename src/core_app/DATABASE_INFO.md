@@ -2,19 +2,12 @@
 
 ## ⚠️ QUAN TRỌNG - DATABASE ĐANG SỬ DỤNG
 
-**File database chính thức:** `Pharmacy_V15_StrictConstraints.Finall.sql`
+**File database chính thức:** `Pharmacy_V15_Data_Final.sql`
 
-- Đường dẫn: `CodeGenData/Pharmacy_V15_StrictConstraints.Finall.sql`
+- Đường dẫn: `Pharmacy_V15_Data_Final.sql`
 - Đây là phiên bản database mới nhất (V15) với các ràng buộc dữ liệu chặt chẽ (Strict Constraints)
 - **KHÔNG SỬ DỤNG** các file SQL khác trong thư mục CodeGenData
 
-## Các file SQL khác (chỉ tham khảo)
-
-- `pharmacy_database.sql` - Phiên bản cũ
-- `Pharmacy_POS_MySQL_Data.sql` - Data mẫu
-- `DataBase_MySQL_Empty.sql` - Schema rỗng
-- `dashboard_demo_data.sql` - Demo data
-- `invoice_schema_update.sql` - Update schema
 
 ## Hướng dẫn truy xuất MySQL
 Hướng dẫn truy xuất MySQL từ Terminal (CMD)Khi bạn đã cấu hình xong biến môi trường (Environment Variables), bạn có thể đứng tại bất kỳ thư mục nào (như D:\GitHub\Group_5\...) để truy xuất dữ liệu.1. Đăng nhập vào MySQL ServerMở CMD và nhập lệnh sau:Bashmysql -u root -p

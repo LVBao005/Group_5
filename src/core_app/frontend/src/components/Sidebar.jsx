@@ -78,7 +78,7 @@ const Sidebar = () => {
             <div className="mt-auto p-4 m-4 bg-white/5 rounded-2xl border border-white/5 group transition-colors">
                 <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{user?.fullName || user?.full_name || 'CHƯA ĐĂNG NHẬP'}</p>
+                        <p className="text-sm font-bold text-white truncate">{user?.full_name || user?.fullName || user?.username || 'CHƯA ĐĂNG NHẬP'}</p>
                         <p className="text-xs text-emerald-500/60 font-medium truncate">
                             {user?.branchName || user?.branch_name || 'Quầy số 01'}
                         </p>

@@ -42,6 +42,7 @@ const Inventory = () => {
     const [selectedMedicineDetail, setSelectedMedicineDetail] = useState(null);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+    const [showExpiringSoonOnly, setShowExpiringSoonOnly] = useState(false);
 
     // Import Stock specific state
     const [showImportModal, setShowImportModal] = useState(false);
@@ -274,13 +275,26 @@ const Inventory = () => {
         }
     };
 
-    // Filter logic for both tabs
+    // Identify medicines with expiring soon batches (< 30 days)
+    const expiringSoonMedicineIds = new Set(
+        batches
+            .filter(b => {
+                if (!b.expiryDate) return false;
+                const today = new Date();
+                const expiry = new Date(b.expiryDate);
+                const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+                return daysUntilExpiry >= 0 && daysUntilExpiry < 30;
+            })
+            .map(b => b.medicine_id)
+    );
+
     const filteredMedicines = medicines.filter(item => {
         const matchesSearch = item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.activeIngredient?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = activeCategory === 'all' || item.categoryName === activeCategory;
         const matchesLowStock = !showLowStockOnly || item.totalStock <= item.minStockLevel;
-        return matchesSearch && matchesCategory && matchesLowStock;
+        const matchesExpiringSoon = !showExpiringSoonOnly || expiringSoonMedicineIds.has(item.medicine_id);
+        return matchesSearch && matchesCategory && matchesLowStock && matchesExpiringSoon;
     });
 
     const filteredBatches = batches.filter(item => {
@@ -410,7 +424,10 @@ const Inventory = () => {
                                     {filteredMedicines.length} Danh mục thuốc
                                 </span>
                                 <button
-                                    onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                                    onClick={() => {
+                                        setShowLowStockOnly(!showLowStockOnly);
+                                        if (!showLowStockOnly) setShowExpiringSoonOnly(false);
+                                    }}
                                     className={cn(
                                         "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all px-4 py-2 rounded-full border",
                                         showLowStockOnly
@@ -419,6 +436,20 @@ const Inventory = () => {
                                     )}
                                 >
                                     <AlertTriangle size={14} /> Thuốc sắp hết
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowExpiringSoonOnly(!showExpiringSoonOnly);
+                                        if (!showExpiringSoonOnly) setShowLowStockOnly(false);
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all px-4 py-2 rounded-full border",
+                                        showExpiringSoonOnly
+                                            ? "bg-amber-500/20 border-amber-500/40 text-amber-500 hover:bg-amber-500/30"
+                                            : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20"
+                                    )}
+                                >
+                                    <Clock size={14} /> Thuốc hết hạn
                                 </button>
                             </div>
                         </div>

@@ -502,9 +502,27 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
 
 
                     {/* Total */}
-                    <div className="flex justify-end">
-                        <div className="bg-[#00ff80]/10 border border-[#00ff80]/20 rounded-2xl px-8 py-4">
-                            <p className="text-xs font-black text-[#00ff80]/60 uppercase tracking-wider mb-2">Tổng cộng</p>
+                    <div className="flex flex-col items-end gap-3 px-4">
+                        {(invoice.points_used > 0) && (
+                            <>
+                                <div className="flex items-center gap-8">
+                                    <span className="text-xs font-black text-white/30 uppercase tracking-widest">Tạm tính</span>
+                                    <span className="text-lg font-bold text-white/60 tabular-nums">
+                                        {formatCurrency(invoice.total_amount + invoice.points_used)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-8 text-orange-400">
+                                    <span className="text-xs font-black uppercase tracking-widest">Điểm đã dùng</span>
+                                    <span className="text-lg font-bold tabular-nums">
+                                        -{formatCurrency(invoice.points_used)}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                        <div className="bg-[#00ff80]/10 border border-[#00ff80]/20 rounded-2xl px-8 py-4 mt-2">
+                            <p className="text-xs font-black text-[#00ff80]/60 uppercase tracking-wider mb-2">
+                                {invoice.points_used > 0 ? 'Tổng thanh toán' : 'Tổng cộng'}
+                            </p>
                             <p className="text-3xl font-black text-[#00ff80] tabular-nums">{formatCurrency(invoice.total_amount)}</p>
                         </div>
                     </div>

@@ -13,13 +13,15 @@ public class Invoice {
     private int pharmacistId;
     private Integer customerId;
     private double totalAmount;
+    private int pointsUsed;
+    private int pointsEarned;
     private boolean isSimulated;
-    
+
     // Joined fields
     private String branchName;
     private String pharmacistName;
     private String customerName;
-    
+
     // Invoice details
     private List<InvoiceDetail> details;
 
@@ -27,14 +29,16 @@ public class Invoice {
     public Invoice() {
     }
 
-    public Invoice(int invoiceId, Timestamp invoiceDate, int branchId, int pharmacistId, 
-                   Integer customerId, double totalAmount, boolean isSimulated) {
+    public Invoice(int invoiceId, Timestamp invoiceDate, int branchId, int pharmacistId,
+            Integer customerId, double totalAmount, int pointsUsed, int pointsEarned, boolean isSimulated) {
         this.invoiceId = invoiceId;
         this.invoiceDate = invoiceDate;
         this.branchId = branchId;
         this.pharmacistId = pharmacistId;
         this.customerId = customerId;
         this.totalAmount = totalAmount;
+        this.pointsUsed = pointsUsed;
+        this.pointsEarned = pointsEarned;
         this.isSimulated = isSimulated;
     }
 
@@ -90,7 +94,23 @@ public class Invoice {
     public boolean isSimulated() {
         return isSimulated;
     }
-    
+
+    public int getPointsUsed() {
+        return pointsUsed;
+    }
+
+    public void setPointsUsed(int pointsUsed) {
+        this.pointsUsed = pointsUsed;
+    }
+
+    public int getPointsEarned() {
+        return pointsEarned;
+    }
+
+    public void setPointsEarned(int pointsEarned) {
+        this.pointsEarned = pointsEarned;
+    }
+
     public boolean getIsSimulated() {
         return isSimulated;
     }
@@ -140,6 +160,8 @@ public class Invoice {
                 ", pharmacistId=" + pharmacistId +
                 ", customerId=" + customerId +
                 ", totalAmount=" + totalAmount +
+                ", pointsUsed=" + pointsUsed +
+                ", pointsEarned=" + pointsEarned +
                 ", isSimulated=" + isSimulated +
                 ", branchName='" + branchName + '\'' +
                 ", pharmacistName='" + pharmacistName + '\'' +

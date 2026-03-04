@@ -97,8 +97,8 @@ public class InvoiceDAO {
             }
 
             // Insert invoice
-            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, is_simulated) "
-                    + "VALUES (?, ?, ?, ?, ?)";
+            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, points_used, points_earned, is_simulated) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?)";
             psInvoice = conn.prepareStatement(sqlInvoice, Statement.RETURN_GENERATED_KEYS);
             psInvoice.setInt(1, branchId);
             psInvoice.setInt(2, pharmacistId);
@@ -108,7 +108,10 @@ public class InvoiceDAO {
                 psInvoice.setNull(3, Types.INTEGER);
             }
             psInvoice.setDouble(4, totalAmount);
-            psInvoice.setBoolean(5, isSimulated);
+            psInvoice.setInt(5, jsonData.has("points_used") ? jsonData.get("points_used").getAsInt() : 0);
+            psInvoice.setInt(6, jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
+                    : (int) (totalAmount / 10));
+            psInvoice.setBoolean(7, isSimulated);
 
             psInvoice.executeUpdate();
 
@@ -234,7 +237,7 @@ public class InvoiceDAO {
         List<Invoice> invoices = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
                 "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                        "i.total_amount, i.is_simulated, " +
+                        "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
                         "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                         "FROM invoices i " +
                         "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -292,7 +295,7 @@ public class InvoiceDAO {
      */
     public Invoice getInvoiceById(int invoiceId) throws SQLException {
         String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.is_simulated, " +
+                "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
                 "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -407,7 +410,7 @@ public class InvoiceDAO {
         List<Invoice> invoices = new ArrayList<>();
 
         String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.is_simulated, " +
+                "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
                 "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
@@ -451,6 +454,8 @@ public class InvoiceDAO {
         }
 
         invoice.setTotalAmount(rs.getDouble("total_amount"));
+        invoice.setPointsUsed(rs.getInt("points_used"));
+        invoice.setPointsEarned(rs.getInt("points_earned"));
         invoice.setIsSimulated(rs.getBoolean("is_simulated"));
         invoice.setBranchName(rs.getString("branch_name"));
         invoice.setPharmacistName(rs.getString("pharmacist_name"));
