@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Receipt,
     Search,
@@ -26,6 +27,7 @@ const Invoices = () => {
     const [filteredInvoices, setFilteredInvoices] = useState([]);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -42,14 +44,27 @@ const Invoices = () => {
 
     // Load invoices from backend
     useEffect(() => {
-        loadInvoices();
+        // First load with spinner
+        loadInvoices(true);
 
-        // Auto-refresh every 30 seconds
+        // Auto-refresh every 15 seconds (Silent)
         const refreshInterval = setInterval(() => {
-            loadInvoices();
-        }, 30000);
+            loadInvoices(false);
+        }, 15000);
 
-        return () => clearInterval(refreshInterval);
+        // Listen for instant sync from other tabs (POS)
+        const syncChannel = new BroadcastChannel('pharmacy_sync');
+        syncChannel.onmessage = (event) => {
+            if (event.data?.type === 'NEW_INVOICE') {
+                console.log('⚡ Instant sync triggered');
+                loadInvoices(false);
+            }
+        };
+
+        return () => {
+            clearInterval(refreshInterval);
+            syncChannel.close();
+        };
     }, []);
 
     // Apply filters
@@ -57,18 +72,23 @@ const Invoices = () => {
         applyFilters();
     }, [invoices, searchTerm, dateFrom, dateTo, pharmacistFilter, statusFilter]);
 
-    const loadInvoices = async () => {
+    const loadInvoices = async (showLoading = false) => {
         try {
-            setLoading(true);
+            if (showLoading) setLoading(true);
+            else setIsRefreshing(true);
+
             // Filter by current user's branch
             const data = await invoiceService.getInvoices({ branchId: currentBranchId });
             setInvoices(data);
         } catch (error) {
             console.error('Error loading invoices:', error);
-            // Use mock data as fallback
-            setInvoices(getMockInvoices());
+            // Only use mock if initial load fails and we have no data
+            if (invoices.length === 0) {
+                setInvoices(getMockInvoices());
+            }
         } finally {
             setLoading(false);
+            setIsRefreshing(false);
         }
     };
 
@@ -187,9 +207,9 @@ const Invoices = () => {
 
                     <div className="flex items-center gap-6 ml-auto">
                         <LiveClock />
-                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
+                        <Link to="/profile" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-[#00ff80] transition-all cursor-pointer border border-white/5 hover:border-[#00ff80]/20 active:scale-95">
                             <User size={20} />
-                        </div>
+                        </Link>
                     </div>
                 </header>
 
@@ -253,11 +273,11 @@ const Invoices = () => {
 
                 {/* Invoices List */}
                 <div className="flex-1 overflow-auto p-10 pt-4">
-                    {loading ? (
+                    {loading && invoices.length === 0 ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center">
                                 <div className="w-16 h-16 border-4 border-[#00ff80]/20 border-t-[#00ff80] rounded-full animate-spin mx-auto mb-4"></div>
-                                <p className="text-white/40 font-bold">Đang tải dữ liệu...</p>
+                                <p className="text-white/40 font-bold tracking-widest uppercase text-[10px]">Đang khởi tạo...</p>
                             </div>
                         </div>
                     ) : (
@@ -398,16 +418,18 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
 
         const groups = {};
         invoice.details.forEach(item => {
-            // Group by medicine (id or name) and unit
-            const key = `${item.medicine_id || item.medicine_name}-${item.unit_sold}`;
+            // Group by medicine (id or name)
+            const key = `${item.medicine_id || item.medicine_name}`;
             if (!groups[key]) {
                 groups[key] = {
                     ...item,
-                    total_quantity: 0,
+                    total_std_quantity: 0,
+                    total_price: 0,
                     batch_ids: []
                 };
             }
-            groups[key].total_quantity += item.quantity_sold;
+            groups[key].total_std_quantity += item.quantity_sold;
+            groups[key].total_price += (item.unit_price * item.quantity_sold);
             if (item.batch_id && !groups[key].batch_ids.includes(item.batch_id)) {
                 groups[key].batch_ids.push(item.batch_id);
             }
@@ -459,9 +481,8 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                                     <tr>
                                         <th className="text-left px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Thuốc</th>
                                         <th className="text-center px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Lô hàng</th>
-                                        <th className="text-center px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Đơn vị</th>
-                                        <th className="text-center px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">SL</th>
-                                        <th className="text-right px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Đơn giá</th>
+                                        <th className="text-center px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Theo Hộp</th>
+                                        <th className="text-center px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Theo Viên</th>
                                         <th className="text-right px-4 py-3 text-xs font-black text-white/40 uppercase tracking-wider">Thành tiền</th>
                                     </tr>
                                 </thead>
@@ -480,11 +501,22 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                                                         ))}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-4 text-sm text-white/60 text-center">{item.unit_sold}</td>
-                                                <td className="px-4 py-4 text-sm text-white text-center font-bold">{item.total_quantity}</td>
-                                                <td className="px-4 py-4 text-sm text-white/60 text-right tabular-nums">{formatCurrency(item.unit_price)}</td>
+                                                <td className="px-4 py-4 text-sm text-white text-center font-bold">
+                                                    {(() => {
+                                                        const rate = item.conversion_rate || 1;
+                                                        const boxes = Math.floor(item.total_std_quantity / rate);
+                                                        const tablets = item.total_std_quantity % rate;
+                                                        let result = [];
+                                                        if (boxes > 0) result.push(`${boxes} ${item.base_unit || 'Hộp'}`);
+                                                        if (tablets > 0) result.push(`${tablets} ${item.sub_unit || 'Viên'}`);
+                                                        return result.join(' + ') || `0 ${item.sub_unit || 'Viên'}`;
+                                                    })()}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-white/60 text-center">
+                                                    {item.total_std_quantity} {item.sub_unit || 'Viên'}
+                                                </td>
                                                 <td className="px-4 py-4 text-sm text-white font-bold text-right tabular-nums">
-                                                    {formatCurrency(item.unit_price * item.total_quantity)}
+                                                    {formatCurrency(item.total_price)}
                                                 </td>
                                             </tr>
                                         ))
@@ -503,27 +535,37 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
 
                     {/* Total */}
                     <div className="flex flex-col items-end gap-3 px-4">
-                        {(invoice.points_used > 0) && (
+                        {(invoice.points_redeemed > 0) && (
                             <>
                                 <div className="flex items-center gap-8">
                                     <span className="text-xs font-black text-white/30 uppercase tracking-widest">Tạm tính</span>
                                     <span className="text-lg font-bold text-white/60 tabular-nums">
-                                        {formatCurrency(invoice.total_amount + invoice.points_used)}
+                                        {formatCurrency(invoice.total_amount + invoice.points_redeemed)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-8 text-orange-400">
                                     <span className="text-xs font-black uppercase tracking-widest">Điểm đã dùng</span>
                                     <span className="text-lg font-bold tabular-nums">
-                                        -{formatCurrency(invoice.points_used)}
+                                        -{formatCurrency(invoice.points_redeemed)}
                                     </span>
                                 </div>
                             </>
                         )}
-                        <div className="bg-[#00ff80]/10 border border-[#00ff80]/20 rounded-2xl px-8 py-4 mt-2">
-                            <p className="text-xs font-black text-[#00ff80]/60 uppercase tracking-wider mb-2">
-                                {invoice.points_used > 0 ? 'Tổng thanh toán' : 'Tổng cộng'}
-                            </p>
-                            <p className="text-3xl font-black text-[#00ff80] tabular-nums">{formatCurrency(invoice.total_amount)}</p>
+                        <div className="flex items-center justify-between w-full mt-2">
+                            {invoice.points_earned > 0 && (
+                                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl px-6 py-4">
+                                    <p className="text-[10px] font-black text-blue-400/60 uppercase tracking-wider mb-1">
+                                        Điểm tích lũy mới
+                                    </p>
+                                    <p className="text-xl font-black text-blue-400">+{formatCurrency(invoice.points_earned)}đ</p>
+                                </div>
+                            )}
+                            <div className="bg-[#00ff80]/10 border border-[#00ff80]/20 rounded-2xl px-8 py-4 ml-auto">
+                                <p className="text-xs font-black text-[#00ff80]/60 uppercase tracking-wider mb-2">
+                                    {invoice.points_redeemed > 0 ? 'Tổng thực thu' : 'Tổng số tiền'}
+                                </p>
+                                <p className="text-3xl font-black text-[#00ff80] tabular-nums">{formatCurrency(invoice.total_amount)}</p>
+                            </div>
                         </div>
                     </div>
                 </div>

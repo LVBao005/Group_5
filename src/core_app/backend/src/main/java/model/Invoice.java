@@ -12,8 +12,10 @@ public class Invoice {
     private int branchId;
     private int pharmacistId;
     private Integer customerId;
-    private double totalAmount;
-    private int pointsUsed;
+    private int subTotal;
+    private int discountAmount;
+    private int totalAmount;
+    private int pointsRedeemed;
     private int pointsEarned;
     private boolean isSimulated;
 
@@ -30,14 +32,17 @@ public class Invoice {
     }
 
     public Invoice(int invoiceId, Timestamp invoiceDate, int branchId, int pharmacistId,
-            Integer customerId, double totalAmount, int pointsUsed, int pointsEarned, boolean isSimulated) {
+            Integer customerId, int subTotal, int discountAmount, int totalAmount,
+            int pointsRedeemed, int pointsEarned, boolean isSimulated) {
         this.invoiceId = invoiceId;
         this.invoiceDate = invoiceDate;
         this.branchId = branchId;
         this.pharmacistId = pharmacistId;
         this.customerId = customerId;
+        this.subTotal = subTotal;
+        this.discountAmount = discountAmount;
         this.totalAmount = totalAmount;
-        this.pointsUsed = pointsUsed;
+        this.pointsRedeemed = pointsRedeemed;
         this.pointsEarned = pointsEarned;
         this.isSimulated = isSimulated;
     }
@@ -83,24 +88,36 @@ public class Invoice {
         this.customerId = customerId;
     }
 
-    public double getTotalAmount() {
+    public int getSubTotal() {
+        return subTotal;
+    }
+
+    public void setSubTotal(int subTotal) {
+        this.subTotal = subTotal;
+    }
+
+    public int getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(int discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
+    public int getTotalAmount() {
         return totalAmount;
     }
 
-    public void setTotalAmount(double totalAmount) {
+    public void setTotalAmount(int totalAmount) {
         this.totalAmount = totalAmount;
     }
 
-    public boolean isSimulated() {
-        return isSimulated;
+    public int getPointsRedeemed() {
+        return pointsRedeemed;
     }
 
-    public int getPointsUsed() {
-        return pointsUsed;
-    }
-
-    public void setPointsUsed(int pointsUsed) {
-        this.pointsUsed = pointsUsed;
+    public void setPointsRedeemed(int pointsRedeemed) {
+        this.pointsRedeemed = pointsRedeemed;
     }
 
     public int getPointsEarned() {
@@ -159,13 +176,12 @@ public class Invoice {
                 ", branchId=" + branchId +
                 ", pharmacistId=" + pharmacistId +
                 ", customerId=" + customerId +
+                ", subTotal=" + subTotal +
+                ", discountAmount=" + discountAmount +
                 ", totalAmount=" + totalAmount +
-                ", pointsUsed=" + pointsUsed +
+                ", pointsRedeemed=" + pointsRedeemed +
                 ", pointsEarned=" + pointsEarned +
                 ", isSimulated=" + isSimulated +
-                ", branchName='" + branchName + '\'' +
-                ", pharmacistName='" + pharmacistName + '\'' +
-                ", customerName='" + customerName + '\'' +
                 '}';
     }
 }

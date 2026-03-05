@@ -25,8 +25,8 @@ public class SaleService {
         invoiceDetailDAO.insertDetail(detail);
 
         // 2. Decrement inventory (quantityChange is negative)
-        // detail.getTotalStdQuantity should be the amount to subtract
-        int quantityToSubtract = -detail.getTotalStdQuantity();
+        // detail.getQuantitySold should be the amount to subtract
+        int quantityToSubtract = -detail.getQuantitySold();
         inventoryDAO.updateBatchQuantity(branchId, detail.getBatchId(), quantityToSubtract);
     }
 }

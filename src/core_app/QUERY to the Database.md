@@ -16,7 +16,6 @@ branch_name: Tên chi nhánh.
 
 address: Địa chỉ chi nhánh.
 
-is_active: Trạng thái hoạt động (Dùng để đóng/mở chi nhánh mà không mất dữ liệu lịch sử).
 
 3. Bảng medicines (Thông tin thuốc cơ bản)
 medicine_id (PK): Mã thuốc.
@@ -38,8 +37,6 @@ base_sell_price: Giá bán theo đơn vị lớn.
 sub_sell_price: Giá bán theo đơn vị nhỏ.
 
 min_stock_level: Ngưỡng cảnh báo tồn kho tối thiểu (Dùng cho Dashboard).
-
-is_active: Trạng thái kinh doanh (Cho phép ngừng bán một loại thuốc).
 
 4. Bảng batches (Quản lý lô hàng nhập)
 batch_id (PK): Mã lô hàng duy nhất.
@@ -74,11 +71,9 @@ branch_id (FK): Làm việc tại chi nhánh nào.
 
 username: Tài khoản đăng nhập.
 
-password: Mật khẩu (mã hóa).
+password: Mật khẩu .
 
 full_name: Tên nhân viên.
-
-is_active: Trạng thái làm việc (Tránh xóa nhân viên đã từng bán hàng).
 
 7. Bảng customers (Khách hàng Membership)
 customer_id (PK): Mã khách hàng.
@@ -128,7 +123,7 @@ movement_id (PK): Mã nhật ký.
 
 inventory_id (FK): Tác động vào dòng kho nào.
 
-type: Loại biến động (BÁN HÀNG, NHẬP HÀNG, ĐIỀU CHỈNH).
+type: Loại biến động (BÁN HÀNG, NHẬP HÀNG).
 
 quantity_change: Số lượng thay đổi (Âm nếu bán, Dương nếu nhập).
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Package,
     Search,
@@ -78,6 +79,8 @@ const Inventory = () => {
 
             data.forEach(item => {
                 const key = item.medicine_id;
+                const status = getExpiryStatus(item.expiry_date);
+
                 if (!masterMap.has(key)) {
                     masterMap.set(key, {
                         medicine_id: item.medicine_id,
@@ -96,7 +99,10 @@ const Inventory = () => {
                 }
 
                 const master = masterMap.get(key);
-                master.totalStock += item.quantity_std || 0;
+                // Only add to total stock if NOT expired
+                if (status !== 'expired') {
+                    master.totalStock += item.quantity_std || 0;
+                }
                 master.batchCount += 1;
 
                 batchList.push({
@@ -112,7 +118,7 @@ const Inventory = () => {
                     subUnit: item.sub_unit,
                     conversionRate: item.conversion_rate || 1,
                     categoryName: item.category_name,
-                    status: getExpiryStatus(item.expiry_date)
+                    status: status
                 });
             });
 
@@ -156,6 +162,22 @@ const Inventory = () => {
 
     useEffect(() => {
         loadData();
+
+        // 1. Polling: Refresh every 60 seconds
+        const pollInterval = setInterval(() => {
+            loadData();
+        }, 60000);
+
+        // 2. Focus Sync: Refresh when tab gains focus
+        const handleFocus = () => {
+            loadData();
+        };
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            clearInterval(pollInterval);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, [branchId]);
 
     // Calculate expiry status
@@ -278,13 +300,7 @@ const Inventory = () => {
     // Identify medicines with expiring soon batches (< 30 days)
     const expiringSoonMedicineIds = new Set(
         batches
-            .filter(b => {
-                if (!b.expiryDate) return false;
-                const today = new Date();
-                const expiry = new Date(b.expiryDate);
-                const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-                return daysUntilExpiry >= 0 && daysUntilExpiry < 30;
-            })
+            .filter(b => b.status === 'expired' || b.status === 'critical' || b.status === 'warning')
             .map(b => b.medicine_id)
     );
 
@@ -310,9 +326,9 @@ const Inventory = () => {
     // Calculate statistics
     const stats = {
         totalMedicines: medicines.length,
-        totalBatches: batches.length,
-        expiringSoon: batches.filter(b => b.status === 'critical' || b.status === 'warning').length,
-        expired: batches.filter(b => b.status === 'expired').length,
+        lowStock: medicines.filter(m => m.totalStock <= m.minStockLevel).length,
+        expiringMedicines: new Set(batches.filter(b => b.status === 'expired' || b.status === 'critical' || b.status === 'warning').map(b => b.medicine_id)).size,
+        expiredBatches: batches.filter(b => b.status === 'expired').length,
         totalValue: batches.reduce((sum, b) => sum + (b.quantityStd * b.importPrice), 0)
     };
 
@@ -347,10 +363,21 @@ const Inventory = () => {
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
+                        <button
+                            onClick={loadData}
+                            disabled={loading}
+                            className={cn(
+                                "p-3 rounded-xl bg-white/5 border border-white/5 text-white/40 hover:text-[#00ff80] hover:border-[#00ff80]/20 transition-all",
+                                loading && "animate-spin cursor-not-allowed"
+                            )}
+                            title="Tải lại dữ liệu"
+                        >
+                            <TrendingUp size={20} className={loading ? "animate-spin" : ""} />
+                        </button>
                         <LiveClock className="hidden sm:block" />
-                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
+                        <Link to="/profile" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-[#00ff80] transition-all cursor-pointer border border-white/5 hover:border-[#00ff80]/20 active:scale-95">
                             <User size={20} />
-                        </div>
+                        </Link>
                     </div>
                 </header>
 
@@ -376,9 +403,9 @@ const Inventory = () => {
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
                         {[
                             { label: 'Tổng danh mục', value: stats.totalMedicines, icon: Database, color: 'text-white' },
-                            { label: 'Tổng lô hàng', value: stats.totalBatches, icon: Package, color: 'text-blue-400' },
-                            { label: 'Sắp hết hạn', value: stats.expiringSoon, icon: AlertTriangle, color: 'text-amber-500' },
-                            { label: 'Đã hết hạn', value: stats.expired, icon: XCircle, color: 'text-rose-500' },
+                            { label: 'Sắp hết thuốc', value: stats.lowStock, icon: AlertTriangle, color: 'text-rose-500' },
+                            { label: 'Sắp hết hạn', value: stats.expiringMedicines, icon: Clock, color: 'text-amber-500' },
+                            { label: 'Lô đã hết hạn', value: stats.expiredBatches, icon: XCircle, color: 'text-rose-500' },
                             { label: 'Giá trị tồn', value: (stats.totalValue / 1000000000).toFixed(1) + 'B', icon: TrendingUp, color: 'text-[#00ff80]' }
                         ].map((stat, i) => (
                             <div key={i} className="bg-[#161a19] border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-[#00ff80]/20 transition-all">

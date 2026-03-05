@@ -7,14 +7,8 @@ import model.Medicine;
 import utils.DBContext;
 
 public class MedicineDAO {
-    private Connection connection;
 
     public MedicineDAO() {
-        try {
-            this.connection = new DBContext().getConnection();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public List<Medicine> getAllMedicines() throws SQLException {
@@ -22,11 +16,14 @@ public class MedicineDAO {
         String sql = "SELECT m.*, c.category_name FROM medicines m " +
                 "JOIN categories c ON m.category_id = c.category_id";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql);
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 medicines.add(extractMedicine(rs));
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return medicines;
     }
@@ -37,7 +34,8 @@ public class MedicineDAO {
                 "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE m.name LIKE ? OR m.brand LIKE ?";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             String pattern = "%" + query + "%";
             ps.setString(1, pattern);
             ps.setString(2, pattern);
@@ -47,6 +45,8 @@ public class MedicineDAO {
                     medicines.add(extractMedicine(rs));
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return medicines;
     }
@@ -55,13 +55,16 @@ public class MedicineDAO {
         String sql = "SELECT m.*, c.category_name FROM medicines m " +
                 "JOIN categories c ON m.category_id = c.category_id " +
                 "WHERE m.medicine_id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractMedicine(rs);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }

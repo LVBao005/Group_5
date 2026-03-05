@@ -2649,7 +2649,83 @@ npm install
 #### 3. Backend: `DashboardServlet.java`
 - **Sửa:** Thay đổi hoàn toàn logic SQL trong hàm `getRevenueByCategory` (dòng 343-368).
 - **Thêm:** Sử dụng `NULLIF` và `Subquery` để tính toán tỉ lệ doanh thu thực tế cho từng danh mục thuốc sau khi đã trừ chiết khấu.
-
+ 
 #### 4. Script & Cleanup
 - **Xóa:** Đã xóa file `backend/test_api.ps1` (đã hoàn thành nhiệm vụ test).
 - **Sửa:** Cập nhật lệnh PowerShell chạy trực tiếp trên Terminal thay vì file `.ps1` để tránh lỗi Unicode và Policy của hệ thống.
+ 
+---
+ 
+## 🔧 Cập Nhật Session - 05/03/2026
+ 
+### 1️⃣ Refactor DAO - Đảm bảo tính nhất quán dữ liệu (Data Consistency)
+ 
+#### 🐛 **Vấn đề:**
+- Dữ liệu tồn kho bị cũ (stale data) khi nhiều tab cùng hoạt động hoặc sau khi thực hiện giao dịch.
+- Nguyên nhân: Sử dụng cùng một Connection duy nhất trong DAO kết hợp với isolation level `REPEATABLE READ` của MySQL dẫn đến việc không đọc được dữ liệu mới nhất đã commit.
+ 
+#### ✅ **Giải pháp:**
+- Refactor **TẤT CẢ** các lớp DAO để sử dụng kết nối mới cho mỗi yêu cầu (fresh connection per request).
+- Sử dụng `try-with-resources` để đảm bảo đóng Resource (Connection, Statement, ResultSet) đúng cách.
+- Quản lý Transaction nội bộ trong các phương thức nghiệp vụ phức tạp.
+ 
+#### 📝 **Files đã sửa:**
+- `InventoryDAO.java`, `InvoiceDAO.java`, `BatchDAO.java`, `MedicineDAO.java`, `PharmacistDAO.java`, `BranchDAO.java`, `CategoryDAO.java`, `CustomerDAO.java`, `InvoiceDetailDAO.java`.
+ 
+---
+ 
+### 2️⃣ Logic Hết Hạn (Expiry) & FEFO (First-Expiry, First-Out)
+ 
+#### 📌 **Yêu cầu:**
+- Loại trừ các lô hàng đã hết hạn khỏi tổng số lượng tồn kho khả dụng.
+- Không cho phép bán các lô hàng đã hết hạn tại POS.
+- Ưu tiên bán các lô hàng có hạn sử dụng ngắn hơn trước (FEFO).
+- Vẫn hiển thị thông tin lô hết hạn trong trang quản lý kho để theo dõi xử lý.
+ 
+#### ✅ **Triển khai:**
+ 
+**1. Backend (InventoryDAO.java):**
+- Cập nhật SQL trong `searchInventoryForPOS` để lọc bỏ các lô hàng có `expiry_date < CURDATE()`.
+- Phương thức `getInventoryByBranch` vẫn trả về tất cả lô để trang quản lý kho hiển thị đầy đủ.
+ 
+**2. Frontend (Inventory.jsx):**
+- Cập nhật logic grouping: Chỉ cộng dồn vào `totalStock` nếu lô hàng chưa hết hạn.
+- Giữ nguyên danh sách `batches` để modal "Chi tiết" vẫn hiện đủ các lô (bao gồm cả lô đã hết hạn).
+ 
+**3. Frontend (POS.jsx):**
+- Lọc bỏ lô hết hạn khỏi danh sách hiển thị và tính toán tồn kho.
+- Tự động sắp xếp các lô hàng theo `expiry_date` tăng dần (FEFO).
+- Thêm kiểm tra nghiêm ngặt trong logic `confirmPayment` để bỏ qua các lô đã hết hạn nếu lỡ có trong cart.
+ 
+---
+ 
+### 3️⃣ Tự Động Đồng Bộ Dữ Liệu Real-time
+ 
+#### 🎨 **Thay đổi:**
+- Áp dụng cơ chế **Polling (60s)**: Tự động tải lại dữ liệu sau mỗi phút.
+- Áp dụng cơ chế **Focus Sync**: Tự động tải lại dữ liệu khi người dùng quay lại tab (window focus).
+- Sử dụng **BroadcastChannel ('pharmacy_sync')**: Thông báo cho các tab khác cập nhật ngay lập tức sau khi hoàn thành thanh toán.
+ 
+#### 📝 **Files đã sửa:**
+- `Inventory.jsx`, `POS.jsx`.
+ 
+---
+ 
+### 4️⃣ Hiển Thị Chi Tiết Hóa Đơn (Theo Hộp & Theo Viên)
+ 
+#### 📌 **Yêu cầu:**
+- Hiển thị rõ số lượng thuốc theo đơn vị lớn (Hộp) và đơn vị nhỏ (Viên) trong chi tiết hóa đơn.
+ 
+#### ✅ **Triển khai:**
+- **InvoiceDetail.java**: Thêm các trường `conversion_rate`, `base_unit`, `sub_unit`.
+- **InvoiceDAO.java**: Cập nhật query để lấy thông tin quy đổi khi truy vấn chi tiết hóa đơn.
+- **Invoices.jsx**: Cập nhật giao diện modal chi tiết để hiển thị cột "Theo Hộp" (vd: 1 Hộp + 5 Viên) và "Theo Viên".
+- **POS.jsx**: Đồng nhất việc gửi số lượng về backend theo đơn vị nhỏ nhất (standard unit) để việc trừ kho chính xác 100%.
+ 
+---
+ 
+## 🎯 Kết Quả Đạt Được
+- ✅ Hệ thống hoạt động chính xác theo nguyên tắc FEFO.
+- ✅ Tuyệt đối không bán nhầm thuốc hết hạn.
+- ✅ Dữ liệu luôn đồng bộ và nhất quán giữa các chi nhánh và các tab trình duyệt.
+- ✅ Giao diện hiển thị minh bạch, dễ hiểu cho dược sĩ.

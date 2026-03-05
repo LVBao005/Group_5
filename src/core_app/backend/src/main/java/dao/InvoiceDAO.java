@@ -19,14 +19,7 @@ import java.util.Map;
  */
 public class InvoiceDAO {
 
-    private Connection connection;
-
     public InvoiceDAO() {
-        try {
-            this.connection = new DBContext().getConnection();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     /**
@@ -39,7 +32,6 @@ public class InvoiceDAO {
         Connection conn = null;
         PreparedStatement psInvoice = null;
         PreparedStatement psDetail = null;
-        PreparedStatement psUpdateInventory = null;
         ResultSet rs = null;
 
         try {
@@ -49,7 +41,9 @@ public class InvoiceDAO {
             // Extract invoice data
             int branchId = jsonData.get("branch_id").getAsInt();
             int pharmacistId = jsonData.get("pharmacist_id").getAsInt();
-            double totalAmount = jsonData.get("total_amount").getAsDouble();
+            int subTotal = jsonData.has("sub_total") ? jsonData.get("sub_total").getAsInt() : 0;
+            int discountAmount = jsonData.has("discount_amount") ? jsonData.get("discount_amount").getAsInt() : 0;
+            int totalAmount = jsonData.get("total_amount").getAsInt();
             boolean isSimulated = jsonData.has("is_simulated") ? jsonData.get("is_simulated").getAsBoolean() : false;
 
             // Handle customer: resolve by phone or create new
@@ -61,11 +55,8 @@ public class InvoiceDAO {
                     Customer customer = customerDAO.getCustomerByPhone(customerPhone, conn);
 
                     if (customer == null) {
-                        // Create new customer with phone and optional name
                         customer = new Customer();
                         customer.setPhoneNumber(customerPhone);
-
-                        // Get customer name from request (optional)
                         String customerName = null;
                         if (jsonData.has("customer_name") && !jsonData.get("customer_name").isJsonNull()) {
                             customerName = jsonData.get("customer_name").getAsString();
@@ -73,22 +64,18 @@ public class InvoiceDAO {
                                 customer.setCustomerName(customerName.trim());
                             }
                         }
-
                         customerDAO.createCustomer(customer, conn);
-
-                        // Get the newly created customer
                         customer = customerDAO.getCustomerByPhone(customerPhone, conn);
                     }
 
                     if (customer != null) {
                         customerId = customer.getCustomerId();
-
-                        // Handle points used/earned via API payload
-                        int pointsUsed = jsonData.has("points_used") ? jsonData.get("points_used").getAsInt() : 0;
+                        int pointsRedeemed = jsonData.has("points_redeemed")
+                                ? jsonData.get("points_redeemed").getAsInt()
+                                : 0;
                         int pointsEarned = jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                                : (int) (totalAmount / 10);
-
-                        int pointsDelta = pointsEarned - pointsUsed;
+                                : (int) (totalAmount / 1000);
+                        int pointsDelta = pointsEarned - pointsRedeemed;
                         if (pointsDelta != 0) {
                             customerDAO.updateCustomerPoints(customerId, pointsDelta, conn);
                         }
@@ -96,9 +83,9 @@ public class InvoiceDAO {
                 }
             }
 
-            // Insert invoice
-            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, total_amount, points_used, points_earned, is_simulated) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            // Insert invoice (V15 schema)
+            String sqlInvoice = "INSERT INTO invoices (branch_id, pharmacist_id, customer_id, sub_total, discount_amount, total_amount, points_redeemed, points_earned, is_simulated) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             psInvoice = conn.prepareStatement(sqlInvoice, Statement.RETURN_GENERATED_KEYS);
             psInvoice.setInt(1, branchId);
             psInvoice.setInt(2, pharmacistId);
@@ -107,138 +94,106 @@ public class InvoiceDAO {
             } else {
                 psInvoice.setNull(3, Types.INTEGER);
             }
-            psInvoice.setDouble(4, totalAmount);
-            psInvoice.setInt(5, jsonData.has("points_used") ? jsonData.get("points_used").getAsInt() : 0);
-            psInvoice.setInt(6, jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                    : (int) (totalAmount / 10));
-            psInvoice.setBoolean(7, isSimulated);
+            psInvoice.setInt(4, subTotal);
+            psInvoice.setInt(5, discountAmount);
+            psInvoice.setInt(6, totalAmount);
+            psInvoice.setInt(7, jsonData.has("points_redeemed") ? jsonData.get("points_redeemed").getAsInt() : 0);
+            psInvoice.setInt(8, jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
+                    : (int) (totalAmount / 1000));
+            psInvoice.setBoolean(9, isSimulated);
 
             psInvoice.executeUpdate();
 
-            // Get generated invoice_id
             rs = psInvoice.getGeneratedKeys();
             int invoiceId = 0;
             if (rs.next()) {
                 invoiceId = rs.getInt(1);
             }
 
-            // Insert invoice details
+            // Insert invoice details (V15 schema: removing unit_sold, total_std_quantity)
             JsonArray details = jsonData.getAsJsonArray("details");
-            String sqlDetail = "INSERT INTO invoice_details (invoice_id, batch_id, unit_sold, quantity_sold, unit_price, total_std_quantity) "
-                    + "VALUES (?, ?, ?, ?, ?, ?)";
+            String sqlDetail = "INSERT INTO invoice_details (invoice_id, batch_id, quantity_sold, unit_price) VALUES (?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
-            // Consolidation Map for inventory updates to prevent 500 errors (Duplicate
-            // batch updates)
             Map<Integer, Integer> batchInventoryDeductions = new HashMap<>();
 
             for (JsonElement detailElement : details) {
                 JsonObject detail = detailElement.getAsJsonObject();
-
                 int batchId = detail.get("batch_id").getAsInt();
-                String unitSold = detail.get("unit_sold").getAsString();
                 int quantitySold = detail.get("quantity_sold").getAsInt();
-                double unitPrice = detail.get("unit_price").getAsDouble();
-                int totalStdQuantity = detail.get("total_std_quantity").getAsInt();
+                int unitPrice = detail.get("unit_price").getAsInt();
 
-                // Collect for consolidated inventory update
-                batchInventoryDeductions.put(batchId,
-                        batchInventoryDeductions.getOrDefault(batchId, 0) + totalStdQuantity);
+                batchInventoryDeductions.put(batchId, batchInventoryDeductions.getOrDefault(batchId, 0) + quantitySold);
 
-                // Insert detail (preserve individual rows for invoice history)
                 psDetail.setInt(1, invoiceId);
                 psDetail.setInt(2, batchId);
-                psDetail.setString(3, unitSold);
-                psDetail.setInt(4, quantitySold);
-                psDetail.setDouble(5, unitPrice);
-                psDetail.setInt(6, totalStdQuantity);
+                psDetail.setInt(3, quantitySold);
+                psDetail.setInt(4, unitPrice);
                 psDetail.addBatch();
             }
-
             psDetail.executeBatch();
 
-            // Perform consolidated inventory updates (Once per Batch ID)
-            String sqlCheckInventory = "SELECT quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ? FOR UPDATE";
-            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE batch_id = ? AND branch_id = ? AND quantity_std >= ?";
+            // Perform consolidated inventory updates + LOG movements
+            String sqlGetInventoryId = "SELECT inventory_id, quantity_std FROM inventory WHERE batch_id = ? AND branch_id = ? FOR UPDATE";
+            String sqlUpdateInventory = "UPDATE inventory SET quantity_std = quantity_std - ? WHERE inventory_id = ?";
+            StockMovementDAO stockMovementDAO = new StockMovementDAO();
 
-            try (PreparedStatement psCheck = conn.prepareStatement(sqlCheckInventory);
+            try (PreparedStatement psGetInv = conn.prepareStatement(sqlGetInventoryId);
                     PreparedStatement psUpdate = conn.prepareStatement(sqlUpdateInventory)) {
 
                 for (Map.Entry<Integer, Integer> entry : batchInventoryDeductions.entrySet()) {
                     int batchId = entry.getKey();
                     int totalNeeded = entry.getValue();
 
-                    // 1. Check aggregate stock availability at branch
-                    psCheck.setInt(1, batchId);
-                    psCheck.setInt(2, branchId);
-                    try (ResultSet rsStock = psCheck.executeQuery()) {
-                        int availableStock = 0;
-                        if (rsStock.next()) {
-                            availableStock = rsStock.getInt("quantity_std");
-                        }
-                        if (availableStock < totalNeeded) {
+                    psGetInv.setInt(1, batchId);
+                    psGetInv.setInt(2, branchId);
+                    try (ResultSet rsInv = psGetInv.executeQuery()) {
+                        if (rsInv.next()) {
+                            int invId = rsInv.getInt("inventory_id");
+                            int available = rsInv.getInt("quantity_std");
+                            if (available < totalNeeded) {
+                                throw new SQLException("Insufficient stock for batch " + batchId);
+                            }
+
+                            // Update Inventory
+                            psUpdate.setInt(1, totalNeeded);
+                            psUpdate.setInt(2, invId);
+                            psUpdate.executeUpdate();
+
+                            // Log Movement
+                            stockMovementDAO.logMovement(invId, "BÁN HÀNG", -totalNeeded, conn);
+                        } else {
                             throw new SQLException(
-                                    "Không đủ số lượng tồn kho tổng cộng cho lô hàng. Batch ID: " + batchId +
-                                            ", Cần: " + totalNeeded + ", Còn lại: " + availableStock);
+                                    "Inventory record not found for batch " + batchId + " at branch " + branchId);
                         }
-                    }
-
-                    // 2. Perform consolidated update
-                    psUpdate.setInt(1, totalNeeded);
-                    psUpdate.setInt(2, batchId);
-                    psUpdate.setInt(3, branchId);
-                    psUpdate.setInt(4, totalNeeded); // Safety check for concurrent updates
-
-                    if (psUpdate.executeUpdate() == 0) {
-                        throw new SQLException(
-                                "Không thể cập nhật tồn kho. Số lượng không đủ hoặc batch không tồn tại tại chi nhánh này. Batch ID: "
-                                        + batchId);
                     }
                 }
             }
 
-            conn.commit(); // Commit transaction
-
-            // Return created invoice
-            return getInvoiceById(invoiceId);
+            conn.commit();
+            return getInvoiceByIdWithConn(invoiceId, conn);
 
         } catch (Exception e) {
-            if (conn != null) {
-                try {
-                    conn.rollback(); // Rollback on error
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            }
+            if (conn != null)
+                conn.rollback();
             throw new SQLException("Failed to create invoice: " + e.getMessage(), e);
         } finally {
-            // Close resources
             if (rs != null)
                 rs.close();
             if (psInvoice != null)
                 psInvoice.close();
             if (psDetail != null)
                 psDetail.close();
-            if (psUpdateInventory != null)
-                psUpdateInventory.close();
-            if (conn != null) {
-                conn.setAutoCommit(true);
+            if (conn != null)
                 conn.close();
-            }
         }
     }
 
-    /**
-     * Get all invoices with optional filters
-     */
     public List<Invoice> getInvoices(String dateFrom, String dateTo, Integer pharmacistId, Integer branchId,
-            Boolean isSimulated)
-            throws SQLException {
+            Boolean isSimulated) throws SQLException {
         List<Invoice> invoices = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-                "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                        "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
-                        "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+                "SELECT i.*, b.branch_name, p.full_name as pharmacist_name, c.customer_name " +
                         "FROM invoices i " +
                         "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
                         "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
@@ -246,27 +201,22 @@ public class InvoiceDAO {
                         "WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
-
         if (dateFrom != null && !dateFrom.isEmpty()) {
             sql.append("AND i.invoice_date >= ? ");
             params.add(dateFrom);
         }
-
         if (dateTo != null && !dateTo.isEmpty()) {
             sql.append("AND i.invoice_date <= ? ");
             params.add(dateTo);
         }
-
         if (pharmacistId != null) {
             sql.append("AND i.pharmacist_id = ? ");
             params.add(pharmacistId);
         }
-
         if (branchId != null) {
             sql.append("AND i.branch_id = ? ");
             params.add(branchId);
         }
-
         if (isSimulated != null) {
             sql.append("AND i.is_simulated = ? ");
             params.add(isSimulated);
@@ -274,193 +224,186 @@ public class InvoiceDAO {
 
         sql.append("ORDER BY i.invoice_date DESC");
 
-        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < params.size(); i++) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++)
                 ps.setObject(i + 1, params.get(i));
-            }
-
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Invoice invoice = extractInvoiceFromResultSet(rs);
-                    invoices.add(invoice);
-                }
+                while (rs.next())
+                    invoices.add(extractInvoiceFromResultSet(rs));
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
-
         return invoices;
     }
 
-    /**
-     * Get a specific invoice by ID with full details
-     */
     public Invoice getInvoiceById(int invoiceId) throws SQLException {
-        String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
-                "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+        try (Connection conn = new DBContext().getConnection()) {
+            return getInvoiceByIdWithConn(invoiceId, conn);
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
+    }
+
+    private Invoice getInvoiceByIdWithConn(int invoiceId, Connection conn) throws SQLException {
+        String sql = "SELECT i.*, b.branch_name, p.full_name as pharmacist_name, c.customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
                 "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
                 "LEFT JOIN customers c ON i.customer_id = c.customer_id " +
                 "WHERE i.invoice_id = ?";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, invoiceId);
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     Invoice invoice = extractInvoiceFromResultSet(rs);
-
-                    // Get invoice details
-                    invoice.setDetails(getInvoiceDetails(invoiceId));
-
+                    invoice.setDetails(getInvoiceDetails(invoiceId, conn));
                     return invoice;
                 }
             }
         }
-
         return null;
     }
 
-    /**
-     * Get invoice details for a specific invoice
-     */
-    private List<InvoiceDetail> getInvoiceDetails(int invoiceId) throws SQLException {
+    private List<InvoiceDetail> getInvoiceDetails(int invoiceId, Connection conn) throws SQLException {
         List<InvoiceDetail> details = new ArrayList<>();
-
-        String sql = "SELECT id.detail_id, id.invoice_id, id.batch_id, id.unit_sold, " +
-                "id.quantity_sold, id.unit_price, id.total_std_quantity, " +
-                "m.name as medicine_name, b.batch_number, b.expiry_date " +
+        String sql = "SELECT id.*, m.name as medicine_name, m.base_unit, m.sub_unit, m.conversion_rate, m.base_sell_price, m.sub_sell_price, b.batch_number, b.expiry_date "
+                +
                 "FROM invoice_details id " +
                 "JOIN batches b ON id.batch_id = b.batch_id " +
                 "JOIN medicines m ON b.medicine_id = m.medicine_id " +
                 "WHERE id.invoice_id = ?";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, invoiceId);
-
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     InvoiceDetail detail = new InvoiceDetail();
                     detail.setDetailId(rs.getInt("detail_id"));
                     detail.setInvoiceId(rs.getInt("invoice_id"));
                     detail.setBatchId(rs.getInt("batch_id"));
-                    detail.setUnitSold(rs.getString("unit_sold"));
                     detail.setQuantitySold(rs.getInt("quantity_sold"));
-                    detail.setUnitPrice(rs.getDouble("unit_price"));
-                    detail.setTotalStdQuantity(rs.getInt("total_std_quantity"));
+                    detail.setUnitPrice(rs.getInt("unit_price"));
                     detail.setMedicineName(rs.getString("medicine_name"));
                     detail.setBatchNumber(rs.getString("batch_number"));
                     detail.setExpiryDate(rs.getDate("expiry_date"));
+                    detail.setBaseUnit(rs.getString("base_unit"));
+                    detail.setSubUnit(rs.getString("sub_unit"));
+                    detail.setConversionRate(rs.getInt("conversion_rate"));
+
+                    // Logic to determine unitSold based on price comparison
+                    int unitPrice = rs.getInt("unit_price");
+                    String baseUnit = rs.getString("base_unit");
+                    String subUnit = rs.getString("sub_unit");
+                    int basePrice = rs.getInt("base_sell_price");
+                    int subPrice = rs.getInt("sub_sell_price");
+                    int conversionRate = rs.getInt("conversion_rate");
+
+                    String unitSold = baseUnit; // Default to base unit
+
+                    if (subUnit != null && !subUnit.isEmpty() && conversionRate > 1) {
+                        // Check if the recorded price matches the sub unit price or is derived from
+                        // base
+                        if (unitPrice == subPrice || unitPrice == (basePrice / conversionRate)) {
+                            unitSold = subUnit;
+                        } else if (unitPrice == basePrice) {
+                            unitSold = baseUnit;
+                        } else if (unitPrice < basePrice) {
+                            // High chance it's the sub unit if significantly cheaper than base
+                            unitSold = subUnit;
+                        }
+                    }
+                    detail.setUnitSold(unitSold);
 
                     details.add(detail);
                 }
             }
         }
-
         return details;
     }
 
-    /**
-     * Get invoice statistics
-     */
     public JsonObject getInvoiceStats(String dateFrom, String dateTo) throws SQLException {
         JsonObject stats = new JsonObject();
-
         StringBuilder sql = new StringBuilder(
-                "SELECT COUNT(*) as total_invoices, " +
-                        "SUM(total_amount) as total_revenue, " +
+                "SELECT COUNT(*) as total_invoices, SUM(total_amount) as total_revenue, " +
                         "SUM(CASE WHEN is_simulated = FALSE THEN 1 ELSE 0 END) as real_count, " +
                         "SUM(CASE WHEN is_simulated = TRUE THEN 1 ELSE 0 END) as simulated_count " +
                         "FROM invoices WHERE 1=1 ");
 
         List<Object> params = new ArrayList<>();
-
         if (dateFrom != null && !dateFrom.isEmpty()) {
             sql.append("AND invoice_date >= ? ");
             params.add(dateFrom);
         }
-
         if (dateTo != null && !dateTo.isEmpty()) {
             sql.append("AND invoice_date <= ? ");
             params.add(dateTo);
         }
 
-        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < params.size(); i++) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++)
                 ps.setObject(i + 1, params.get(i));
-            }
-
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     stats.addProperty("total_invoices", rs.getInt("total_invoices"));
-                    stats.addProperty("total_revenue", rs.getDouble("total_revenue"));
+                    stats.addProperty("total_revenue", rs.getLong("total_revenue"));
                     stats.addProperty("real_count", rs.getInt("real_count"));
                     stats.addProperty("simulated_count", rs.getInt("simulated_count"));
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
-
         return stats;
     }
 
-    /**
-     * Search invoices by invoice ID, pharmacist name, or customer name
-     */
     public List<Invoice> searchInvoices(String searchTerm) throws SQLException {
         List<Invoice> invoices = new ArrayList<>();
-
-        String sql = "SELECT i.invoice_id, i.invoice_date, i.branch_id, i.pharmacist_id, i.customer_id, " +
-                "i.total_amount, i.points_used, i.points_earned, i.is_simulated, " +
-                "b.branch_name, p.full_name as pharmacist_name, c.customer_name as customer_name " +
+        String sql = "SELECT i.*, b.branch_name, p.full_name as pharmacist_name, c.customer_name " +
                 "FROM invoices i " +
                 "LEFT JOIN branches b ON i.branch_id = b.branch_id " +
                 "LEFT JOIN pharmacists p ON i.pharmacist_id = p.pharmacist_id " +
                 "LEFT JOIN customers c ON i.customer_id = c.customer_id " +
-                "WHERE CAST(i.invoice_id AS VARCHAR) LIKE ? " +
-                "OR p.full_name LIKE ? " +
-                "OR c.customer_name LIKE ? " +
+                "WHERE CAST(i.invoice_id AS CHAR) LIKE ? OR p.full_name LIKE ? OR c.customer_name LIKE ? " +
                 "ORDER BY i.invoice_date DESC";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             String searchPattern = "%" + searchTerm + "%";
             ps.setString(1, searchPattern);
             ps.setString(2, searchPattern);
             ps.setString(3, searchPattern);
-
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Invoice invoice = extractInvoiceFromResultSet(rs);
-                    invoices.add(invoice);
-                }
+                while (rs.next())
+                    invoices.add(extractInvoiceFromResultSet(rs));
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
-
         return invoices;
     }
 
-    /**
-     * Extract Invoice object from ResultSet
-     */
     private Invoice extractInvoiceFromResultSet(ResultSet rs) throws SQLException {
-        Invoice invoice = new Invoice();
-        invoice.setInvoiceId(rs.getInt("invoice_id"));
-        invoice.setInvoiceDate(rs.getTimestamp("invoice_date"));
-        invoice.setBranchId(rs.getInt("branch_id"));
-        invoice.setPharmacistId(rs.getInt("pharmacist_id"));
-
+        Invoice inv = new Invoice();
+        inv.setInvoiceId(rs.getInt("invoice_id"));
+        inv.setInvoiceDate(rs.getTimestamp("invoice_date"));
+        inv.setBranchId(rs.getInt("branch_id"));
+        inv.setPharmacistId(rs.getInt("pharmacist_id"));
         int customerId = rs.getInt("customer_id");
-        if (!rs.wasNull()) {
-            invoice.setCustomerId(customerId);
-        }
-
-        invoice.setTotalAmount(rs.getDouble("total_amount"));
-        invoice.setPointsUsed(rs.getInt("points_used"));
-        invoice.setPointsEarned(rs.getInt("points_earned"));
-        invoice.setIsSimulated(rs.getBoolean("is_simulated"));
-        invoice.setBranchName(rs.getString("branch_name"));
-        invoice.setPharmacistName(rs.getString("pharmacist_name"));
-        invoice.setCustomerName(rs.getString("customer_name"));
-
-        return invoice;
+        if (!rs.wasNull())
+            inv.setCustomerId(customerId);
+        inv.setSubTotal(rs.getInt("sub_total"));
+        inv.setDiscountAmount(rs.getInt("discount_amount"));
+        inv.setTotalAmount(rs.getInt("total_amount"));
+        inv.setPointsRedeemed(rs.getInt("points_redeemed"));
+        inv.setPointsEarned(rs.getInt("points_earned"));
+        inv.setIsSimulated(rs.getBoolean("is_simulated"));
+        inv.setBranchName(rs.getString("branch_name"));
+        inv.setPharmacistName(rs.getString("pharmacist_name"));
+        inv.setCustomerName(rs.getString("customer_name"));
+        return inv;
     }
 }

@@ -9,30 +9,31 @@ import model.Customer;
 import utils.DBContext;
 
 public class CustomerDAO {
-    private Connection connection;
 
     public CustomerDAO() {
-        try {
-            this.connection = new DBContext().getConnection();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public List<Customer> getAllCustomers() throws SQLException {
         List<Customer> list = new ArrayList<>();
         String sql = "SELECT * FROM customers";
-        try (PreparedStatement ps = connection.prepareStatement(sql);
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 list.add(extractCustomer(rs));
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return list;
     }
 
     public Customer getCustomerByPhone(String phoneNumber) throws SQLException {
-        return getCustomerByPhone(phoneNumber, this.connection);
+        try (Connection conn = new DBContext().getConnection()) {
+            return getCustomerByPhone(phoneNumber, conn);
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
     }
 
     public Customer getCustomerByPhone(String phoneNumber, Connection conn) throws SQLException {
@@ -49,7 +50,11 @@ public class CustomerDAO {
     }
 
     public void createCustomer(Customer customer) throws SQLException {
-        createCustomer(customer, this.connection);
+        try (Connection conn = new DBContext().getConnection()) {
+            createCustomer(customer, conn);
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
     }
 
     public void createCustomer(Customer customer, Connection conn) throws SQLException {
@@ -72,13 +77,16 @@ public class CustomerDAO {
 
     public Customer getCustomerById(int id) throws SQLException {
         String sql = "SELECT * FROM customers WHERE customer_id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractCustomer(rs);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -93,7 +101,8 @@ public class CustomerDAO {
                 "JOIN invoices i ON c.customer_id = i.customer_id " +
                 "GROUP BY c.customer_id, c.customer_name, c.phone_number " +
                 "ORDER BY total_spent DESC LIMIT ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -105,6 +114,8 @@ public class CustomerDAO {
                     list.add(map);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return list;
     }

@@ -80,7 +80,7 @@ public class PharmacistApiServlet extends HttpServlet {
 
             // Parse JSON
             JsonObject jsonData = gson.fromJson(sb.toString(), JsonObject.class);
-            
+
             String username = jsonData.get("username").getAsString();
             String password = jsonData.get("password").getAsString();
             String fullName = jsonData.get("full_name").getAsString();
@@ -125,6 +125,74 @@ public class PharmacistApiServlet extends HttpServlet {
                 out.print(gson.toJson(Map.of("success", false, "error", "Không thể tạo tài khoản")));
             }
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print(gson.toJson(Map.of("success", false, "error", e.getMessage())));
+        }
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        PrintWriter out = response.getWriter();
+
+        try {
+            StringBuilder sb = new StringBuilder();
+            BufferedReader reader = request.getReader();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+            Pharmacist p = gson.fromJson(sb.toString(), Pharmacist.class);
+            if (p.getPharmacistId() == 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print(gson.toJson(Map.of("success", false, "error", "Thiếu ID dược sĩ")));
+                return;
+            }
+
+            boolean updated = pharmacistDAO.updatePharmacist(p);
+
+            if (updated) {
+                out.print(gson.toJson(Map.of("success", true, "message", "Cập nhật thành công")));
+            } else {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                out.print(gson.toJson(Map.of("success", false, "error", "Không tìm thấy dược sĩ")));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print(gson.toJson(Map.of("success", false, "error", e.getMessage())));
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        PrintWriter out = response.getWriter();
+
+        try {
+            String idStr = request.getParameter("id");
+            if (idStr == null || idStr.isEmpty()) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print(gson.toJson(Map.of("success", false, "error", "Thiếu ID dược sĩ")));
+                return;
+            }
+
+            int id = Integer.parseInt(idStr);
+            boolean deleted = pharmacistDAO.deletePharmacist(id);
+
+            if (deleted) {
+                out.print(gson.toJson(Map.of("success", true, "message", "Xóa tài khoản thành công")));
+            } else {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                out.print(gson.toJson(Map.of("success", false, "error", "Không tìm thấy dược sĩ")));
+            }
         } catch (Exception e) {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

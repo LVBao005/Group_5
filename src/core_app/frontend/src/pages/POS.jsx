@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Search,
     ShoppingCart,
@@ -59,90 +60,124 @@ const POS = () => {
     const branch = { branch_name: user?.branch_name || "Chi nhánh chính", address: "Hệ thống trung tâm" };
 
     // Load Data
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch inventory for current branch (default 1)
-                const response = await inventoryService.getInventoryByBranch(user?.branch_id || 1);
+    const fetchData = async (showLoading = true) => {
+        try {
+            if (showLoading) setLoading(true);
+            // Fetch inventory for current branch (default 1)
+            const response = await inventoryService.getInventoryByBranch(user?.branch_id || 1);
 
-                // Check if response is successful and has data
-                if (!response || !response.success || !Array.from(response.data)) {
-                    console.error("Invalid inventory data structure:", response);
-                    setLoading(false);
-                    return;
+            // Check if response is successful and has data
+            if (!response || !response.success || !Array.from(response.data)) {
+                console.error("Invalid inventory data structure:", response);
+                return;
+            }
+
+            const inventoryData = response.data;
+
+            // Process inventory into Medicines with Batches
+            const grouped = {};
+            const cats = new Set();
+
+            inventoryData.forEach(item => {
+                // Collect categories
+                if (item.category_id && item.category_name) {
+                    cats.add(JSON.stringify({ category_id: item.category_id, category_name: item.category_name }));
                 }
 
-                const inventoryData = response.data;
+                if (!grouped[item.medicine_id]) {
+                    grouped[item.medicine_id] = {
+                        medicine_id: item.medicine_id,
+                        name: item.medicine_name,
+                        base_unit: item.base_unit,
+                        sub_unit: item.sub_unit,
+                        base_sell_price: item.base_sell_price || 0,
+                        sub_sell_price: item.sub_sell_price || 0,
+                        conversion_rate: item.conversion_rate || 1,
+                        category_id: item.category_id,
+                        batches: [],
+                        // Add image placeholder if needed, or mapping logic
+                        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
+                    };
+                }
+                grouped[item.medicine_id].batches.push({
+                    batch_id: item.batch_id,
+                    quantity_std: item.quantity_std,
+                    expiry_date: item.expiry_date,
+                    batch_number: item.batch_number
+                });
+            });
 
-                // Process inventory into Medicines with Batches
-                const grouped = {};
-                const cats = new Set();
+            // Finalize medicines list
+            const medicinesList = Object.values(grouped).map(m => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
 
-                inventoryData.forEach(item => {
-                    // Collect categories
-                    if (item.category_id && item.category_name) {
-                        cats.add(JSON.stringify({ category_id: item.category_id, category_name: item.category_name }));
-                    }
-
-                    if (!grouped[item.medicine_id]) {
-                        grouped[item.medicine_id] = {
-                            medicine_id: item.medicine_id,
-                            name: item.medicine_name,
-                            base_unit: item.base_unit,
-                            sub_unit: item.sub_unit,
-                            base_sell_price: item.base_sell_price || 0,
-                            sub_sell_price: item.sub_sell_price || 0,
-                            conversion_rate: item.conversion_rate || 1,
-                            category_id: item.category_id,
-                            batches: [],
-                            // Add image placeholder if needed, or mapping logic
-                            image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
-                        };
-                    }
-                    grouped[item.medicine_id].batches.push({
-                        batch_id: item.batch_id,
-                        quantity_std: item.quantity_std,
-                        expiry_date: item.expiry_date,
-                        batch_number: item.batch_number
-                    });
+                // Filter out expired batches
+                m.batches = m.batches.filter(b => {
+                    const expiry = new Date(b.expiry_date);
+                    return expiry >= today;
                 });
 
-                // Finalize medicines list
-                const medicinesList = Object.values(grouped).map(m => {
-                    m.total_stock = m.batches.reduce((sum, b) => sum + (b.quantity_std || 0), 0);
+                m.total_stock = m.batches.reduce((sum, b) => sum + (b.quantity_std || 0), 0);
 
-                    // Sort batches by expiry (FIFO)
-                    m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+                // Sort batches by expiry (FIFO/FEFO)
+                m.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
 
-                    // Debug: Log stock calculation for Hapacol
-                    if (m.name?.includes('Hapacol')) {
-                        console.log(`📦 ${m.name}:`, {
-                            batches: m.batches.length,
-                            quantities: m.batches.map(b => `Batch ${b.batch_number}: ${b.quantity_std}`),
-                            total: m.total_stock,
-                            conversion_rate: m.conversion_rate
-                        });
+                return m;
+            });
+
+            setMedicines(medicinesList);
+            setCategories(Array.from(cats).map(c => JSON.parse(c)));
+
+            // Update available stock based on what's NOT in cart currently
+            // (If we use refresh ngầm, we should ideally compute availableStock carefully)
+            const stockMap = {};
+            medicinesList.forEach(m => {
+                let currentStdInCart = 0;
+                cart.forEach(cartItem => {
+                    if (cartItem.medicine_id === m.medicine_id) {
+                        currentStdInCart += cartItem.is_sub ? cartItem.quantity : (cartItem.quantity * m.conversion_rate);
                     }
-
-                    return m;
                 });
+                stockMap[m.medicine_id] = m.total_stock - currentStdInCart;
+            });
+            setAvailableStock(stockMap);
 
-                setMedicines(medicinesList);
-                setCategories(Array.from(cats).map(c => JSON.parse(c)));
+        } catch (error) {
+            console.error("Failed to load POS data", error);
+        } finally {
+            if (showLoading) setLoading(false);
+        }
+    };
 
-                // Initialize available stock (same as total_stock initially)
-                const stockMap = {};
-                medicinesList.forEach(m => {
-                    stockMap[m.medicine_id] = m.total_stock;
-                });
-                setAvailableStock(stockMap);
+    useEffect(() => {
+        fetchData(true);
 
-            } catch (error) {
-                console.error("Failed to load POS data", error);
+        // Polling: Refresh every 60 seconds
+        const pollInterval = setInterval(() => {
+            fetchData(false); // Silent refresh
+        }, 60000);
+
+        // Focus Sync: Refresh when tab gains focus
+        const handleFocus = () => {
+            fetchData(false); // Silent refresh
+        };
+        window.addEventListener('focus', handleFocus);
+
+        // Listen for internal sync events (e.g., from other tabs after checkout)
+        const syncChannel = new BroadcastChannel('pharmacy_sync');
+        syncChannel.onmessage = (event) => {
+            if (event.data.type === 'NEW_INVOICE') {
+                fetchData(false);
             }
         };
-        fetchData();
-    }, []);
+
+        return () => {
+            clearInterval(pollInterval);
+            window.removeEventListener('focus', handleFocus);
+            syncChannel.close();
+        };
+    }, [user?.branch_id]);
 
     // Filter logic
     const filteredMedicines = medicines.filter(m => {
@@ -376,13 +411,10 @@ const POS = () => {
         const checked = e.target.checked;
         setUsePoints(checked);
         if (checked && customerPoints >= 1000) {
-            // "giảm tối đa là bằng số tiền, tròn 1000"
-            const autoUsePoints = Math.min(
-                Math.floor(customerPoints / 1000) * 1000,
-                Math.ceil(totalAmount / 1000) * 1000
-            );
-
-            setPointsToUse(autoUsePoints > totalAmount ? Math.floor(totalAmount / 1000) * 1000 + 1000 : autoUsePoints);
+            // Chỉ sử dụng bội số của 1000, làm tròn xuống
+            const maxUsable = Math.min(customerPoints, totalAmount);
+            const autoUsePoints = Math.floor(maxUsable / 1000) * 1000;
+            setPointsToUse(autoUsePoints);
         } else {
             setPointsToUse(0);
         }
@@ -423,39 +455,29 @@ const POS = () => {
                 const isSub = item.is_sub;
                 let remainingStdQty = isSub ? item.quantity : (item.quantity * conversionRate);
 
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                // Sort batches by expiry (FEFO) - although already sorted in fetchData
+                medicine.batches.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+
                 for (const batch of medicine.batches) {
                     if (remainingStdQty <= 0) break;
                     if (batch.quantity_std <= 0) continue;
 
+                    // Skip expired batches
+                    const expiry = new Date(batch.expiry_date);
+                    if (expiry < today) continue;
+
                     const takeStd = Math.min(remainingStdQty, batch.quantity_std);
 
                     if (takeStd > 0) {
-                        let unitSold = item.unit;
-                        let quantitySold = 0;
-                        let unitPrice = 0;
-
-                        if (isSub) {
-                            quantitySold = takeStd;
-                            unitSold = medicine.sub_unit;
-                            unitPrice = medicine.sub_sell_price;
-                        } else {
-                            if (takeStd % conversionRate === 0) {
-                                quantitySold = takeStd / conversionRate;
-                                unitSold = medicine.base_unit;
-                                unitPrice = medicine.base_sell_price;
-                            } else {
-                                quantitySold = takeStd;
-                                unitSold = medicine.sub_unit;
-                                unitPrice = medicine.base_sell_price / conversionRate;
-                            }
-                        }
+                        let unitPricePerStd = isSub ? medicine.sub_sell_price : (medicine.base_sell_price / conversionRate);
 
                         invoiceDetails.push({
                             batch_id: batch.batch_id,
-                            unit_sold: unitSold,
-                            quantity_sold: Math.round(quantitySold),
-                            unit_price: unitPrice,
-                            total_std_quantity: Math.round(takeStd)
+                            quantity_sold: Math.round(takeStd),
+                            unit_price: Math.round(unitPricePerStd)
                         });
 
                         batch.quantity_std -= takeStd;
@@ -473,22 +495,41 @@ const POS = () => {
                 pharmacist_id: parseInt(localStorage.getItem('pharmacistId')) || user?.pharmacist_id || 1,
                 customer_phone: phone || null,
                 customer_name: customerName || null,
+                sub_total: totalAmount,
+                discount_amount: pointsToUse,
                 total_amount: finalAmount,
                 is_simulated: false,
                 details: invoiceDetails,
-                points_used: pointsToUse,
+                points_redeemed: pointsToUse,
                 points_earned: Math.floor(finalAmount / 10)
             };
 
             const response = await invoiceService.createInvoice(payload);
             setSuccess(true);
+
+            // Broadcast the new invoice event for instant syncing across tabs
+            try {
+                const syncChannel = new BroadcastChannel('pharmacy_sync');
+                syncChannel.postMessage({ type: 'NEW_INVOICE' });
+                syncChannel.close();
+            } catch (e) {
+                console.error('Broadcast error:', e);
+            }
+
+            // Silent update inventory after success
+            fetchData(false);
+
             setTimeout(() => {
                 setCart([]);
                 setPhone('');
                 setCustomerName('');
                 setPointsToUse(0);
-                window.location.reload();
-            }, 1000);
+                setIsOldCustomer(false);
+                setShowNameInput(false);
+                setUsePoints(false);
+                setSuccess(false);
+                setShowInvoice(false);
+            }, 1500);
         } catch (error) {
             console.error('❌ API Error:', error);
             alert("Thanh toán thất bại: " + (error.response?.data?.error || error.message));
@@ -520,9 +561,9 @@ const POS = () => {
 
                     <div className="flex items-center gap-6 ml-auto">
                         <LiveClock />
-                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-colors cursor-pointer border border-white/5">
+                        <Link to="/profile" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-[#00ff80] transition-all cursor-pointer border border-white/5 hover:border-[#00ff80]/20 active:scale-95">
                             <User size={20} />
-                        </div>
+                        </Link>
                     </div>
                 </header>
 
@@ -815,23 +856,37 @@ const POS = () => {
                                             )}
                                         />
                                         {isOldCustomer && (
-                                            <div className="bg-blue-500/10 text-blue-400 text-xs font-black px-4 py-3.5 rounded-2xl border border-blue-500/20 text-center uppercase tracking-widest shrink-0">
-                                                {customerPoints} điểm
+                                            <div className="bg-blue-500/10 text-blue-400 text-[10px] font-black px-4 py-2.5 rounded-2xl border border-blue-500/20 text-center uppercase tracking-widest shrink-0 flex flex-col items-center justify-center min-w-[120px]">
+                                                <span className="opacity-50 text-[8px] mb-0.5">Điểm hiện tại</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span>{formatPrice(customerPoints)}đ</span>
+                                                    {(pointsToUse > 0 || finalAmount >= 1000) && (
+                                                        <>
+                                                            <ChevronRight size={10} className="opacity-30" />
+                                                            <span className="text-[#00ff80]">{formatPrice(customerPoints - pointsToUse + Math.floor(finalAmount / 10))}đ</span>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
 
-                                    {isOldCustomer && customerPoints >= 1000 && (
+                                    {isOldCustomer && (
                                         <div className="p-4 bg-[#0d0f0e] border border-[#00ff80]/20 rounded-2xl animate-in fade-in duration-300">
                                             <label className="flex items-center gap-3 cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={usePoints}
                                                     onChange={handleUsePointsChange}
-                                                    className="w-5 h-5 rounded border-white/10 text-[#00ff80] focus:ring-[#00ff80]/30 cursor-pointer"
+                                                    disabled={customerPoints < 1000}
+                                                    className={cn(
+                                                        "w-5 h-5 rounded border-white/10 text-[#00ff80] focus:ring-[#00ff80]/30 cursor-pointer",
+                                                        customerPoints < 1000 && "opacity-30 cursor-not-allowed"
+                                                    )}
                                                 />
-                                                <span className="text-sm font-bold text-white">
+                                                <span className={cn("text-sm font-bold", customerPoints < 1000 ? "text-white/20" : "text-white")}>
                                                     Sử dụng điểm tích lũy {usePoints && <span className="text-[#00ff80]">(-{formatPrice(pointsToUse)} điểm)</span>}
+                                                    {customerPoints < 1000 && <span className="text-[9px] block text-white/20 uppercase">(Cần tối thiểu 1.000đ)</span>}
                                                 </span>
                                             </label>
                                         </div>
@@ -842,10 +897,10 @@ const POS = () => {
                             <div className="flex justify-between items-center px-2 mt-4">
                                 <div className="flex items-center gap-3">
                                     <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Tạm tính</span>
-                                    {showNameInput && totalAmount >= 1000 && (
+                                    {showNameInput && finalAmount >= 1000 && (
                                         <div className="bg-[#00ff80]/10 text-[#00ff80] text-[10px] font-black px-2 py-0.5 rounded-lg border border-[#00ff80]/20 flex items-center gap-1 animate-in fade-in zoom-in duration-300">
                                             <span>+</span>
-                                            <span>{Math.floor(finalAmount / 10)} điểm</span>
+                                            <span>{formatPrice(Math.floor(finalAmount / 10))} điểm mới</span>
                                         </div>
                                     )}
                                 </div>
@@ -964,28 +1019,35 @@ const POS = () => {
                             </div>
                         </div>
 
-                        {/* Footer */}
+                        {/* Footer - Bill Breakdown */}
                         <div className="p-10 bg-[#0d0f0e]/50 border-t border-white/5">
                             <div className="flex flex-col gap-4">
-                                {pointsToUse > 0 && (
-                                    <>
-                                        <div className="flex justify-between items-center px-2">
-                                            <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Tạm tính</span>
-                                            <span className="text-xl font-black text-white/60 tabular-nums">
-                                                {formatPrice(totalAmount)} <span className="text-[10px] ml-1">đ</span>
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center px-2">
+                                <div className="space-y-3 bg-white/5 p-6 rounded-3xl border border-white/5 mb-2">
+                                    <div className="flex justify-between items-center px-2">
+                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Tạm tính</span>
+                                        <span className="text-xl font-black text-white/60 tabular-nums">
+                                            {formatPrice(totalAmount)} <span className="text-[10px] ml-1">đ</span>
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center px-2">
+                                        <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Sử dụng điểm</span>
-                                            <span className="text-xl font-black text-orange-500 tabular-nums">
-                                                -{formatPrice(pointsToUse)} <span className="text-[10px] ml-1">đ</span>
-                                            </span>
+                                            {pointsToUse > 0 && (
+                                                <span className="text-[9px] font-black bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded border border-orange-500/20">-{formatPrice(pointsToUse)}đ</span>
+                                            )}
                                         </div>
-                                    </>
-                                )}
-                                <div className={cn("flex justify-between items-center px-2", pointsToUse > 0 && "pt-4 border-t border-white/5")}>
-                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Cần thanh toán</span>
-                                    <span className="text-4xl font-black text-[#00ff80] tracking-tighter tabular-nums">
+                                        <span className={cn(
+                                            "text-xl font-black tabular-nums",
+                                            pointsToUse > 0 ? "text-orange-500" : "text-white/20"
+                                        )}>
+                                            -{formatPrice(pointsToUse)} <span className="text-[10px] ml-1">đ</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center px-4 py-2">
+                                    <span className="text-xs font-black text-white uppercase tracking-[0.2em]">Tổng cần thanh toán</span>
+                                    <span className="text-4xl font-black text-[#00ff80] tracking-tighter tabular-nums drop-shadow-[0_0_20px_rgba(0,255,128,0.2)]">
                                         {formatPrice(finalAmount)} <span className="text-xs ml-1">đ</span>
                                     </span>
                                 </div>

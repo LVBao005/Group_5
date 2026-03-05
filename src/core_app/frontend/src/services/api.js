@@ -7,6 +7,7 @@ export { authService } from './authService';
 export { invoiceService } from './invoiceService';
 export { medicineService } from './medicineService';
 export { inventoryService } from './inventoryService';
+export { pharmacistService } from './pharmacistService';
 export { default as dashboardService } from './dashboardService';
 
 /**

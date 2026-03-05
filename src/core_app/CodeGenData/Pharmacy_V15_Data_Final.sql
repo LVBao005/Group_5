@@ -1,6 +1,6 @@
 -- PHARMACY DATASET V15.0 - STRICT CONSTRAINTS
-CREATE DATABASE IF NOT EXISTS pharmacy_v15;
-USE pharmacy_v15;
+CREATE DATABASE IF NOT EXISTS pmdb;
+USE pmdb;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `stock_movements`, `invoice_details`, `invoices`, `inventory`, `pharmacists`, `customers`, `batches`, `medicines`, `categories`, `branches`;

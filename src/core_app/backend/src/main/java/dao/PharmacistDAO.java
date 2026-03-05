@@ -7,21 +7,16 @@ import model.Pharmacist;
 import utils.DBContext;
 
 public class PharmacistDAO {
-    private Connection connection;
 
     public PharmacistDAO() {
-        try {
-            this.connection = new DBContext().getConnection();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public Pharmacist login(String username, String password) throws SQLException {
         String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
                 "JOIN branches b ON p.branch_id = b.branch_id " +
                 "WHERE p.username = ? AND p.password = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, username);
             ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
@@ -29,6 +24,8 @@ public class PharmacistDAO {
                     return extractPharmacist(rs, true);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -37,11 +34,14 @@ public class PharmacistDAO {
         List<Pharmacist> list = new ArrayList<>();
         String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
                 "JOIN branches b ON p.branch_id = b.branch_id";
-        try (PreparedStatement ps = connection.prepareStatement(sql);
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 list.add(extractPharmacist(rs, true));
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return list;
     }
@@ -51,13 +51,16 @@ public class PharmacistDAO {
         String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
                 "JOIN branches b ON p.branch_id = b.branch_id " +
                 "WHERE p.branch_id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, branchId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(extractPharmacist(rs, true));
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return list;
     }
@@ -66,13 +69,16 @@ public class PharmacistDAO {
         String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
                 "JOIN branches b ON p.branch_id = b.branch_id " +
                 "WHERE p.pharmacist_id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractPharmacist(rs, true);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -81,13 +87,16 @@ public class PharmacistDAO {
         String sql = "SELECT p.*, b.branch_name FROM pharmacists p " +
                 "JOIN branches b ON p.branch_id = b.branch_id " +
                 "WHERE p.username = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractPharmacist(rs, true);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -97,13 +106,16 @@ public class PharmacistDAO {
      */
     public Pharmacist getUserByUsername(String username) throws SQLException {
         String sql = "SELECT * FROM pharmacists WHERE username = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractPharmacist(rs, false);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -113,15 +125,52 @@ public class PharmacistDAO {
      */
     public boolean createPharmacist(Pharmacist pharmacist) throws SQLException {
         String sql = "INSERT INTO pharmacists (branch_id, username, password, full_name, role) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, pharmacist.getBranchId());
             ps.setString(2, pharmacist.getUsername());
             ps.setString(3, pharmacist.getPassword());
             ps.setString(4, pharmacist.getFullName());
             ps.setString(5, pharmacist.getRole());
-            
+
             int rows = ps.executeUpdate();
             return rows > 0;
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
+    }
+
+    /**
+     * Update an existing pharmacist (excluding username and password)
+     */
+    public boolean updatePharmacist(Pharmacist pharmacist) throws SQLException {
+        String sql = "UPDATE pharmacists SET full_name = ?, role = ?, branch_id = ? WHERE pharmacist_id = ?";
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, pharmacist.getFullName());
+            ps.setString(2, pharmacist.getRole());
+            ps.setInt(3, pharmacist.getBranchId());
+            ps.setInt(4, pharmacist.getPharmacistId());
+
+            int rows = ps.executeUpdate();
+            return rows > 0;
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
+    }
+
+    /**
+     * Delete a pharmacist
+     */
+    public boolean deletePharmacist(int id) throws SQLException {
+        String sql = "DELETE FROM pharmacists WHERE pharmacist_id = ?";
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            int rows = ps.executeUpdate();
+            return rows > 0;
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
     }
 

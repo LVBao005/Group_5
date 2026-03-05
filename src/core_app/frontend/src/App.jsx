@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Profile from './pages/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -31,6 +32,15 @@ function App() {
                         element={
                             <ProtectedRoute allowedRoles={['ADMIN', 'STAFF']}>
                                 <Invoices />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/profile"
+                        element={
+                            <ProtectedRoute allowedRoles={['ADMIN', 'STAFF']}>
+                                <Profile />
                             </ProtectedRoute>
                         }
                     />

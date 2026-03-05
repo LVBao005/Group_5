@@ -7,40 +7,40 @@ import model.Batch;
 import utils.DBContext;
 
 public class BatchDAO {
-    private Connection connection;
 
     public BatchDAO() {
-        try {
-            this.connection = new DBContext().getConnection();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public List<Batch> getBatchesByMedicine(int medicineId) throws SQLException {
         List<Batch> batches = new ArrayList<>();
         // FIFO: Order by expiry_date ASC
         String sql = "SELECT * FROM batches WHERE medicine_id = ? ORDER BY expiry_date ASC";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, medicineId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     batches.add(extractBatch(rs));
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return batches;
     }
 
     public Batch getBatchById(int id) throws SQLException {
         String sql = "SELECT * FROM batches WHERE batch_id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractBatch(rs);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return null;
     }
@@ -54,7 +54,8 @@ public class BatchDAO {
                 "JOIN inventory i ON b.batch_id = i.batch_id " +
                 "WHERE i.branch_id = ? AND i.quantity_std > 0 " +
                 "ORDER BY b.expiry_date ASC";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (Connection connection = new DBContext().getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, branchId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -68,6 +69,8 @@ public class BatchDAO {
                     batches.add(b);
                 }
             }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
         }
         return batches;
     }

@@ -9,11 +9,13 @@ public class InvoiceDetail {
     private int detailId;
     private int invoiceId;
     private int batchId;
-    private String unitSold;
     private int quantitySold;
-    private double unitPrice;
-    private int totalStdQuantity;
-    
+    private int unitPrice;
+    private String unitSold;
+    private int conversionRate;
+    private String baseUnit;
+    private String subUnit;
+
     // Joined fields
     private String medicineName;
     private String batchNumber;
@@ -23,15 +25,14 @@ public class InvoiceDetail {
     public InvoiceDetail() {
     }
 
-    public InvoiceDetail(int detailId, int invoiceId, int batchId, String unitSold, 
-                        int quantitySold, double unitPrice, int totalStdQuantity) {
+    public InvoiceDetail(int detailId, int invoiceId, int batchId,
+            int quantitySold, int unitPrice) {
         this.detailId = detailId;
         this.invoiceId = invoiceId;
         this.batchId = batchId;
-        this.unitSold = unitSold;
         this.quantitySold = quantitySold;
         this.unitPrice = unitPrice;
-        this.totalStdQuantity = totalStdQuantity;
+        this.unitSold = "";
     }
 
     // Getters and Setters
@@ -59,14 +60,6 @@ public class InvoiceDetail {
         this.batchId = batchId;
     }
 
-    public String getUnitSold() {
-        return unitSold;
-    }
-
-    public void setUnitSold(String unitSold) {
-        this.unitSold = unitSold;
-    }
-
     public int getQuantitySold() {
         return quantitySold;
     }
@@ -75,20 +68,20 @@ public class InvoiceDetail {
         this.quantitySold = quantitySold;
     }
 
-    public double getUnitPrice() {
+    public int getUnitPrice() {
         return unitPrice;
     }
 
-    public void setUnitPrice(double unitPrice) {
+    public void setUnitPrice(int unitPrice) {
         this.unitPrice = unitPrice;
     }
 
-    public int getTotalStdQuantity() {
-        return totalStdQuantity;
+    public String getUnitSold() {
+        return unitSold;
     }
 
-    public void setTotalStdQuantity(int totalStdQuantity) {
-        this.totalStdQuantity = totalStdQuantity;
+    public void setUnitSold(String unitSold) {
+        this.unitSold = unitSold;
     }
 
     public String getMedicineName() {
@@ -115,16 +108,42 @@ public class InvoiceDetail {
         this.expiryDate = expiryDate;
     }
 
+    public int getConversionRate() {
+        return conversionRate;
+    }
+
+    public void setConversionRate(int conversionRate) {
+        this.conversionRate = conversionRate;
+    }
+
+    public String getBaseUnit() {
+        return baseUnit;
+    }
+
+    public void setBaseUnit(String baseUnit) {
+        this.baseUnit = baseUnit;
+    }
+
+    public String getSubUnit() {
+        return subUnit;
+    }
+
+    public void setSubUnit(String subUnit) {
+        this.subUnit = subUnit;
+    }
+
     @Override
     public String toString() {
         return "InvoiceDetail{" +
                 "detailId=" + detailId +
                 ", invoiceId=" + invoiceId +
                 ", batchId=" + batchId +
-                ", unitSold='" + unitSold + '\'' +
                 ", quantitySold=" + quantitySold +
                 ", unitPrice=" + unitPrice +
-                ", totalStdQuantity=" + totalStdQuantity +
+                ", unitSold='" + unitSold + '\'' +
+                ", conversionRate=" + conversionRate +
+                ", baseUnit='" + baseUnit + '\'' +
+                ", subUnit='" + subUnit + '\'' +
                 ", medicineName='" + medicineName + '\'' +
                 ", batchNumber='" + batchNumber + '\'' +
                 ", expiryDate=" + expiryDate +
