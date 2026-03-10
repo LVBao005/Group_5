@@ -352,9 +352,9 @@ public class DashboardServlet extends HttpServlet {
             // Proportional distribution of total_amount among items
             // (Item_Value / Invoice_Total_Value) * Invoice_Final_Amount
             queryBuilder.append("SUM( ");
-            queryBuilder.append("  (id.total_std_quantity * id.unit_price) / ");
+            queryBuilder.append("  (id.quantity_sold * id.unit_price) / ");
             queryBuilder.append(
-                    "  NULLIF((SELECT SUM(id2.total_std_quantity * id2.unit_price) FROM invoice_details id2 WHERE id2.invoice_id = i.invoice_id), 0) ");
+                    "  NULLIF((SELECT SUM(id2.quantity_sold * id2.unit_price) FROM invoice_details id2 WHERE id2.invoice_id = i.invoice_id), 0) ");
             queryBuilder.append("  * i.total_amount ");
             queryBuilder.append(") as revenue, ");
 

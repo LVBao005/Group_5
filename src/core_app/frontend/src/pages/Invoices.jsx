@@ -557,7 +557,7 @@ const InvoiceDetailModal = ({ invoice, onClose }) => {
                                     <p className="text-[10px] font-black text-blue-400/60 uppercase tracking-wider mb-1">
                                         Điểm tích lũy mới
                                     </p>
-                                    <p className="text-xl font-black text-blue-400">+{formatCurrency(invoice.points_earned)}đ</p>
+                                    <p className="text-xl font-black text-blue-400">+{formatCurrency(invoice.points_earned)}</p>
                                 </div>
                             )}
                             <div className="bg-[#00ff80]/10 border border-[#00ff80]/20 rounded-2xl px-8 py-4 ml-auto">

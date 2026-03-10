@@ -1,6 +1,8 @@
 # Compiled class files
 *.class
 
+TM POS.md
+
 # Maven
 target/
 pom.xml.tag

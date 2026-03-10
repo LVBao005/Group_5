@@ -88,6 +88,9 @@ public class PosSimulator {
         System.out.println("Backend URL:    " + SimulatorConfig.BASE_URL);
         System.out.println("Branch ID:      " + SimulatorConfig.BRANCH_ID);
         System.out.println("Max Quantity:   " + SimulatorConfig.MAX_QUANTITY);
+        System.out.println("Fixed Medicine: "
+                + (SimulatorConfig.IS_FIXED_MEDICINE ? "Bật (ID: " + SimulatorConfig.FIXED_MEDICINE_ID + ")"
+                        : "Tắt (Ngẫu nhiên)"));
         System.out.println("Delay Seconds:  " + SimulatorConfig.DELAY_SECONDS);
         System.out.println("═══════════════════════════════════════════════════════════════");
 
@@ -115,8 +118,24 @@ public class PosSimulator {
                     continue;
                 }
 
-                // Bước 3: Chọn ngẫu nhiên 1 loại thuốc
-                InventoryItem selectedItem = inventory[random.nextInt(inventory.length)];
+                // Bước 3: Chọn thuốc
+                InventoryItem selectedItem = null;
+                if (SimulatorConfig.IS_FIXED_MEDICINE) {
+                    for (InventoryItem item : inventory) {
+                        if (item.getMedicineId() == SimulatorConfig.FIXED_MEDICINE_ID) {
+                            selectedItem = item;
+                            break;
+                        }
+                    }
+                    if (selectedItem == null) {
+                        logWarning("Không tìm thấy thuốc có ID " + SimulatorConfig.FIXED_MEDICINE_ID
+                                + " trong kho. Đang chọn ngẫu nhiên...");
+                    }
+                }
+
+                if (selectedItem == null) {
+                    selectedItem = inventory[random.nextInt(inventory.length)];
+                }
 
                 // Bước 4: Chọn số lượng ngẫu nhiên (1 tới MAX_QUANTITY)
                 int maxAvailable = Math.min(SimulatorConfig.MAX_QUANTITY, selectedItem.getQuantityStd());

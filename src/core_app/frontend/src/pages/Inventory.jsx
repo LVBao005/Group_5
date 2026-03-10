@@ -79,7 +79,7 @@ const Inventory = () => {
 
             data.forEach(item => {
                 const key = item.medicine_id;
-                const status = getExpiryStatus(item.expiry_date);
+                const status = getExpiryStatus(item.expiry_date, item.quantity_std);
 
                 if (!masterMap.has(key)) {
                     masterMap.set(key, {
@@ -149,7 +149,7 @@ const Inventory = () => {
                     expiryDate,
                     quantityStd,
                     batchNumber,
-                    status: getExpiryStatus(expiryDate)
+                    status: getExpiryStatus(expiryDate, quantityStd)
                 };
             });
             setCentralBatches(centralBatchesFormatted);
@@ -180,8 +180,11 @@ const Inventory = () => {
         };
     }, [branchId]);
 
-    // Calculate expiry status
-    const getExpiryStatus = (expiryDate) => {
+    // Calculate expiry and stock status
+    const getExpiryStatus = (expiryDate, quantity) => {
+        // Hết thuốc takes precedence
+        if (quantity !== undefined && quantity <= 0) return 'out_of_stock';
+
         if (!expiryDate) return 'unknown';
 
         const today = new Date();
@@ -196,6 +199,7 @@ const Inventory = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
+            case 'out_of_stock': return 'bg-slate-500/10 border-slate-500/20 text-slate-400';
             case 'expired': return 'bg-rose-500/10 border-rose-500/20 text-rose-500';
             case 'critical': return 'bg-rose-500/10 border-rose-500/20 text-rose-500';
             case 'warning': return 'bg-amber-500/10 border-amber-500/20 text-amber-500';
@@ -206,6 +210,7 @@ const Inventory = () => {
 
     const getStatusLabel = (status) => {
         switch (status) {
+            case 'out_of_stock': return 'Hết thuốc';
             case 'expired': return 'Đã hết hạn';
             case 'critical': return 'Gấp rút';
             case 'warning': return 'Cảnh báo';

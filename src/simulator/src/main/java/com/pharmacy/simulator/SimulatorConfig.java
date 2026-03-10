@@ -16,6 +16,8 @@ public class SimulatorConfig {
     // 3. Cấu hình lấy thuốc
     public static final int BRANCH_ID = 1; // ID của chi nhánh
     public static final int MAX_QUANTITY = 2; // Số lượng thuốc tối đa mỗi lần mua
+    public static final boolean IS_FIXED_MEDICINE = false; // Bật để chỉ chọn 1 loại thuốc cố định false
+    public static final int FIXED_MEDICINE_ID = 1; // ID của thuốc cố định nếu IS_FIXED_MEDICINE = true
 
     // 4. Cấu hình thời gian
     public static final int DELAY_SECONDS = 10; // Nghỉ bao nhiêu giây mới gửi tiếp
