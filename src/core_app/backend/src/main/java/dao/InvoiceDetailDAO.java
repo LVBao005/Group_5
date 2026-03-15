@@ -18,7 +18,7 @@ public class InvoiceDetailDAO {
             ps.setInt(1, detail.getInvoiceId());
             ps.setInt(2, detail.getBatchId());
             ps.setInt(3, detail.getQuantitySold());
-            ps.setInt(4, detail.getUnitPrice());
+            ps.setDouble(4, detail.getUnitPrice());
             ps.executeUpdate();
         } catch (ClassNotFoundException e) {
             throw new SQLException(e);
@@ -71,7 +71,7 @@ public class InvoiceDetailDAO {
         detail.setInvoiceId(rs.getInt("invoice_id"));
         detail.setBatchId(rs.getInt("batch_id"));
         detail.setQuantitySold(rs.getInt("quantity_sold"));
-        detail.setUnitPrice(rs.getInt("unit_price"));
+        detail.setUnitPrice(rs.getDouble("unit_price"));
         detail.setMedicineName(rs.getString("medicine_name"));
         detail.setBatchNumber(rs.getString("batch_number"));
         detail.setExpiryDate(rs.getDate("expiry_date"));

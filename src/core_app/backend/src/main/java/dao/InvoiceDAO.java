@@ -121,14 +121,14 @@ public class InvoiceDAO {
                 JsonObject detail = detailElement.getAsJsonObject();
                 int batchId = detail.get("batch_id").getAsInt();
                 int quantitySold = detail.get("quantity_sold").getAsInt();
-                int unitPrice = detail.get("unit_price").getAsInt();
+                double unitPrice = detail.get("unit_price").getAsDouble();
 
                 batchInventoryDeductions.put(batchId, batchInventoryDeductions.getOrDefault(batchId, 0) + quantitySold);
 
                 psDetail.setInt(1, invoiceId);
                 psDetail.setInt(2, batchId);
                 psDetail.setInt(3, quantitySold);
-                psDetail.setInt(4, unitPrice);
+                psDetail.setDouble(4, unitPrice);
                 psDetail.addBatch();
             }
             psDetail.executeBatch();
@@ -285,7 +285,7 @@ public class InvoiceDAO {
                     detail.setInvoiceId(rs.getInt("invoice_id"));
                     detail.setBatchId(rs.getInt("batch_id"));
                     detail.setQuantitySold(rs.getInt("quantity_sold"));
-                    detail.setUnitPrice(rs.getInt("unit_price"));
+                    detail.setUnitPrice(rs.getDouble("unit_price"));
                     detail.setMedicineName(rs.getString("medicine_name"));
                     detail.setBatchNumber(rs.getString("batch_number"));
                     detail.setExpiryDate(rs.getDate("expiry_date"));
@@ -294,7 +294,7 @@ public class InvoiceDAO {
                     detail.setConversionRate(rs.getInt("conversion_rate"));
 
                     // Logic to determine unitSold based on price comparison
-                    int unitPrice = rs.getInt("unit_price");
+                    double unitPrice = rs.getDouble("unit_price");
                     String baseUnit = rs.getString("base_unit");
                     String subUnit = rs.getString("sub_unit");
                     int basePrice = rs.getInt("base_sell_price");
@@ -306,7 +306,7 @@ public class InvoiceDAO {
                     if (subUnit != null && !subUnit.isEmpty() && conversionRate > 1) {
                         // Check if the recorded price matches the sub unit price or is derived from
                         // base
-                        if (unitPrice == subPrice || unitPrice == (basePrice / conversionRate)) {
+                        if (unitPrice == subPrice || Math.abs(unitPrice - (double) basePrice / conversionRate) < 0.01) {
                             unitSold = subUnit;
                         } else if (unitPrice == basePrice) {
                             unitSold = baseUnit;

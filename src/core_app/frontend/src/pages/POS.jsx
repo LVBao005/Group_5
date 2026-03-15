@@ -477,7 +477,7 @@ const POS = () => {
                         invoiceDetails.push({
                             batch_id: batch.batch_id,
                             quantity_sold: Math.round(takeStd),
-                            unit_price: Math.round(unitPricePerStd)
+                            unit_price: unitPricePerStd
                         });
 
                         batch.quantity_std -= takeStd;

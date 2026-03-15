@@ -10,7 +10,7 @@ public class InvoiceDetail {
     private int invoiceId;
     private int batchId;
     private int quantitySold;
-    private int unitPrice;
+    private double unitPrice;
     private String unitSold;
     private int conversionRate;
     private String baseUnit;
@@ -26,7 +26,7 @@ public class InvoiceDetail {
     }
 
     public InvoiceDetail(int detailId, int invoiceId, int batchId,
-            int quantitySold, int unitPrice) {
+            int quantitySold, double unitPrice) {
         this.detailId = detailId;
         this.invoiceId = invoiceId;
         this.batchId = batchId;
@@ -68,11 +68,11 @@ public class InvoiceDetail {
         this.quantitySold = quantitySold;
     }
 
-    public int getUnitPrice() {
+    public double getUnitPrice() {
         return unitPrice;
     }
 
-    public void setUnitPrice(int unitPrice) {
+    public void setUnitPrice(double unitPrice) {
         this.unitPrice = unitPrice;
     }
 
