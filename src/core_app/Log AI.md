@@ -2698,34 +2698,157 @@ npm install
 - Thêm kiểm tra nghiêm ngặt trong logic `confirmPayment` để bỏ qua các lô đã hết hạn nếu lỡ có trong cart.
  
 ---
- 
-### 3️⃣ Tự Động Đồng Bộ Dữ Liệu Real-time
- 
-#### 🎨 **Thay đổi:**
-- Áp dụng cơ chế **Polling (60s)**: Tự động tải lại dữ liệu sau mỗi phút.
-- Áp dụng cơ chế **Focus Sync**: Tự động tải lại dữ liệu khi người dùng quay lại tab (window focus).
-- Sử dụng **BroadcastChannel ('pharmacy_sync')**: Thông báo cho các tab khác cập nhật ngay lập tức sau khi hoàn thành thanh toán.
- 
-#### 📝 **Files đã sửa:**
-- `Inventory.jsx`, `POS.jsx`.
- 
+
+## 📅 Session: 15/03/2026 – Sửa Lỗi Làm Tròn Giá Bán (unit_price Rounding)
+
+### 📋 Tổng Quan
+**Vấn đề:** Khi bán thuốc Efferalgan 500mg 1 hộp (16 viên, giá 85.000đ), hóa đơn hiển thị **85.008đ** thay vì 85.000đ do lỗi làm tròn khi quy đổi giá theo viên.
+
 ---
- 
-### 4️⃣ Hiển Thị Chi Tiết Hóa Đơn (Theo Hộp & Theo Viên)
- 
-#### 📌 **Yêu cầu:**
-- Hiển thị rõ số lượng thuốc theo đơn vị lớn (Hộp) và đơn vị nhỏ (Viên) trong chi tiết hóa đơn.
- 
-#### ✅ **Triển khai:**
-- **InvoiceDetail.java**: Thêm các trường `conversion_rate`, `base_unit`, `sub_unit`.
-- **InvoiceDAO.java**: Cập nhật query để lấy thông tin quy đổi khi truy vấn chi tiết hóa đơn.
-- **Invoices.jsx**: Cập nhật giao diện modal chi tiết để hiển thị cột "Theo Hộp" (vd: 1 Hộp + 5 Viên) và "Theo Viên".
-- **POS.jsx**: Đồng nhất việc gửi số lượng về backend theo đơn vị nhỏ nhất (standard unit) để việc trừ kho chính xác 100%.
- 
+
+### 1️⃣ Hỏi: Giải thích `unit_price` là gì?
+
+#### 💬 **Câu hỏi:**
+> unit_price: Giá bán thực tế tại thời điểm đó — bạn hiểu là như thế nào?
+
+#### ✅ **Trả lời:**
+- `unit_price` là mức giá chính xác mà khách hàng đã trả cho mỗi đơn vị mặt hàng tại thời điểm lập hóa đơn.
+- Lưu cứng giá vào `invoice_details` để **bảo vệ dữ liệu lịch sử** — nếu giá thay đổi sau này, hóa đơn cũ vẫn chính xác.
+- Phản ánh đúng giá khuyến mãi, chiết khấu, giá sỉ tại thời điểm giao dịch.
+
 ---
- 
-## 🎯 Kết Quả Đạt Được
-- ✅ Hệ thống hoạt động chính xác theo nguyên tắc FEFO.
-- ✅ Tuyệt đối không bán nhầm thuốc hết hạn.
-- ✅ Dữ liệu luôn đồng bộ và nhất quán giữa các chi nhánh và các tab trình duyệt.
-- ✅ Giao diện hiển thị minh bạch, dễ hiểu cho dược sĩ.
+
+### 2️⃣ Hỏi: Giải pháp xử lý sai số làm tròn?
+
+#### 💬 **Câu hỏi:**
+> Thuốc Eff bán 1 hộp (16 viên) giá 85.000đ, khi qua hóa đơn tính theo viên nên hiển thị 85.008đ. Có cách nào sửa?
+
+#### ✅ **Trả lời 3 cách:**
+1. **Cách 1:** Lưu `unit_price` theo đơn vị bán, thêm cột `sold_unit`.
+2. **Cách 2:** Vẫn quy đổi về viên, bù sai số ở dòng cuối.
+3. **Cách 3:** Dùng `DECIMAL(12,2)` thay vì `INT`, bỏ làm tròn.
+
+**Khuyến nghị:** Kết hợp Cách 1 + Cách 3 cho triệt để nhất.
+
+---
+
+### 3️⃣ Hỏi: Kiểu dữ liệu MySQL cho `unit_price`?
+
+#### 💬 **Câu hỏi:**
+> unit_price trong MySQL nên để kiểu gì?
+
+#### ✅ **Trả lời:**
+```sql
+unit_price DECIMAL(12, 2)
+```
+- `DECIMAL` (số thập phân chính xác), không dùng `FLOAT`/`DOUBLE`.
+- `12` = tổng số chữ số, `2` = số chữ số thập phân.
+
+---
+
+### 4️⃣ Hỏi: Tại sao đã đổi DECIMAL(12,2) mà vẫn bị 5313?
+
+#### 💬 **Câu hỏi:**
+> Tại sao mình mua thuốc 85.000đ (1 hộp 16 viên) mà unit_price lại thành 5313, dù đã chuyển DECIMAL(12,2)?
+
+#### ✅ **Trả lời:**
+- Vấn đề **không nằm ở MySQL** mà ở **code ứng dụng** (`POS.jsx`) đang dùng `Math.round()` để làm tròn **trước khi** INSERT vào database.
+- `85000 / 16 = 5312.5` → `Math.round(5312.5) = 5313` → gửi `5313` vào DB.
+- `DECIMAL(12,2)` chỉ giúp lưu số thập phân, nhưng code đã gửi số nguyên sai rồi.
+
+---
+
+### 5️⃣ Yêu cầu: Sửa theo cách bỏ làm tròn
+
+#### 💬 **Yêu cầu:**
+> Làm theo cách: Bỏ làm tròn, để giá lẻ thập phân: unit_price = 5312.50
+
+#### ✅ **Đã sửa — Tổng cộng 4 files:**
+
+**File 1: `frontend/src/pages/POS.jsx` (line 480)**
+```diff
+- unit_price: Math.round(unitPricePerStd)
++ unit_price: unitPricePerStd
+```
+
+**File 2: `backend/src/main/java/model/InvoiceDetail.java`**
+```diff
+- private int unitPrice;
++ private double unitPrice;
+
+- public int getUnitPrice() { ... }
+- public void setUnitPrice(int unitPrice) { ... }
++ public double getUnitPrice() { ... }
++ public void setUnitPrice(double unitPrice) { ... }
+```
+
+**File 3: `backend/src/main/java/dao/InvoiceDAO.java`**
+```diff
+// Khi INSERT (line 124, 131):
+- int unitPrice = detail.get("unit_price").getAsInt();
+- psDetail.setInt(4, unitPrice);
++ double unitPrice = detail.get("unit_price").getAsDouble();
++ psDetail.setDouble(4, unitPrice);
+
+// Khi SELECT (line 288, 297):
+- detail.setUnitPrice(rs.getInt("unit_price"));
+- int unitPrice = rs.getInt("unit_price");
++ detail.setUnitPrice(rs.getDouble("unit_price"));
++ double unitPrice = rs.getDouble("unit_price");
+
+// Sửa logic so sánh giá (line 309):
+- if (unitPrice == subPrice || unitPrice == (basePrice / conversionRate))
++ if (unitPrice == subPrice || Math.abs(unitPrice - (double) basePrice / conversionRate) < 0.01)
+```
+
+**File 4: `backend/src/main/java/dao/InvoiceDetailDAO.java`**
+```diff
+// INSERT (line 21):
+- ps.setInt(4, detail.getUnitPrice());
++ ps.setDouble(4, detail.getUnitPrice());
+
+// SELECT (line 74):
+- detail.setUnitPrice(rs.getInt("unit_price"));
++ detail.setUnitPrice(rs.getDouble("unit_price"));
+```
+
+---
+
+### 6️⃣ Lỗi 500 sau khi sửa
+
+#### 💬 **Báo lỗi:**
+> Thanh toán thất bại: Request failed with status code 500. Cả endpoint inventory lẫn invoice đều lỗi 500.
+
+#### ✅ **Trả lời:**
+- Lỗi 500 trên **cả hai** endpoint (inventory + invoice) cho thấy **toàn bộ backend đang crash**.
+- Nguyên nhân: Backend chưa được **rebuild sạch** (`mvn clean package`) sau khi thay đổi kiểu `int` → `double` trong Java.
+- Class file cũ còn cache, gây conflict khi Tomcat load → toàn bộ servlet container fail.
+- **Cần:** Chạy `mvn clean package` rồi redeploy file `.war` mới.
+
+---
+
+### 🔗 Chuỗi Nguyên Nhân Gốc (Root Cause Chain)
+
+```
+Frontend (POS.jsx):
+  85000 / 16 = 5312.5
+  → Math.round(5312.5) = 5313  ❌ Làm tròn sai
+
+Backend (InvoiceDAO.java):
+  → getAsInt() truncate 5312.5 → 5312  ❌ Ép kiểu int
+  → setInt() gửi 5312 vào MySQL
+
+MySQL (DECIMAL(12,2)):
+  → Lưu 5312.00 hoặc 5313.00  ❌ Mất phần thập phân
+
+Kết quả: 5313 × 16 = 85,008đ  ❌ Sai 8đ
+```
+
+### ✅ Flow Sau Khi Sửa
+
+```
+Frontend: 85000 / 16 = 5312.50 (giữ nguyên, không round)
+Backend:  getAsDouble() → 5312.50, setDouble() → MySQL
+MySQL:    DECIMAL(12,2) lưu 5312.50
+Kết quả:  5312.50 × 16 = 85,000đ  ✅ Chính xác
+```

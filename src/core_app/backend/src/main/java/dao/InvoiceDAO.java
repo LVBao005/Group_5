@@ -74,7 +74,7 @@ public class InvoiceDAO {
                                 ? jsonData.get("points_redeemed").getAsInt()
                                 : 0;
                         int pointsEarned = jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                                : (int) (totalAmount / 1000);
+                                : (int) (totalAmount / 10);
                         int pointsDelta = pointsEarned - pointsRedeemed;
                         if (pointsDelta != 0) {
                             customerDAO.updateCustomerPoints(customerId, pointsDelta, conn);
@@ -99,7 +99,7 @@ public class InvoiceDAO {
             psInvoice.setInt(6, totalAmount);
             psInvoice.setInt(7, jsonData.has("points_redeemed") ? jsonData.get("points_redeemed").getAsInt() : 0);
             psInvoice.setInt(8, jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                    : (int) (totalAmount / 1000));
+                    : (int) (totalAmount / 10));
             psInvoice.setBoolean(9, isSimulated);
 
             psInvoice.executeUpdate();

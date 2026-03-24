@@ -183,8 +183,7 @@ const POS = () => {
     const filteredMedicines = medicines.filter(m => {
         const matchesCategory = activeCategory === 0 || m.category_id === activeCategory;
         const matchesSearch = searchTerm.trim() === '' ||
-            (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (m.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
+            (m.name || '').toLowerCase().includes(searchTerm.toLowerCase());
         return matchesCategory && matchesSearch;
     });
 
@@ -373,6 +372,10 @@ const POS = () => {
             alert('Vui lòng nhập số điện thoại');
             return;
         }
+        if (phone.trim().length < 10) {
+            alert('Số điện thoại không hợp lệ (phải nhập đủ 10 số)');
+            return;
+        }
 
         try {
             const data = await invoiceService.getCustomerByPhone(phone);
@@ -551,7 +554,7 @@ const POS = () => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#00ff80] transition-colors" size={18} />
                         <input
                             type="text"
-                            placeholder="Tìm tên thuốc, thương hiệu..."
+                            placeholder="Tìm tên thuốc..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-[#1a1d1c] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#00ff80]/20 transition-all text-white"
@@ -821,15 +824,19 @@ const POS = () => {
                             <div className="relative group flex gap-2">
                                 <input
                                     type="text"
+                                    maxLength={10}
                                     placeholder="Số điện thoại khách hàng"
                                     value={phone}
                                     onChange={(e) => {
-                                        setPhone(e.target.value);
-                                        setShowNameInput(false);
-                                        setIsOldCustomer(false);
-                                        setCustomerPoints(0);
-                                        setUsePoints(false);
-                                        setPointsToUse(0);
+                                        const val = e.target.value;
+                                        if (val === '' || /^[0-9]+$/.test(val)) {
+                                            setPhone(val);
+                                            setShowNameInput(false);
+                                            setIsOldCustomer(false);
+                                            setCustomerPoints(0);
+                                            setUsePoints(false);
+                                            setPointsToUse(0);
+                                        }
                                     }}
                                     className="flex-1 bg-[#0d0f0e] border border-white/5 rounded-2xl py-3.5 px-6 text-sm focus:outline-none focus:border-[#00ff80]/30 transition-all text-white placeholder:text-white/10"
                                 />
