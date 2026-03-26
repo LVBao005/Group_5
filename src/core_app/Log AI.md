@@ -2851,4 +2851,82 @@ Frontend: 85000 / 16 = 5312.50 (giữ nguyên, không round)
 Backend:  getAsDouble() → 5312.50, setDouble() → MySQL
 MySQL:    DECIMAL(12,2) lưu 5312.50
 Kết quả:  5312.50 × 16 = 85,000đ  ✅ Chính xác
-```
+```
+## 📅 Session: 25/03/2026 – Sửa Simulator gửi request
+
+Analyzed
+Analyzed
+Hiểu rồi! Dự án là hệ thống quản lý chuỗi nhà thuốc, với Project B (Simulator) dùng để giả lập giao dịch POS gửi request đến backend. Bạn muốn thêm cấu hình số lượng requests mỗi lần gửi vào 
+
+SimulatorConfig.java
+.
+
+Edited
++5
+-2
+Đã thêm xong! Đây là những gì đã thay đổi trong 
+
+SimulatorConfig.java
+:
+
+java
+// 4. Cấu hình số lượng request mỗi lần gửi
+public static final int REQUESTS_PER_BATCH = 5; // Số lượng request gửi trong 1 lần (1 đợt)
+// 5. Cấu hình thời gian
+public static final int DELAY_SECONDS = 10; // Nghỉ bao nhiêu giây giữa các đợt gửi
+Cách sử dụng: Ở phần Simulator gửi request (thường trong vòng lặp chính), bạn dùng SimulatorConfig.REQUESTS_PER_BATCH để lặp đúng số lần trước khi nghỉ DELAY_SECONDS giây:
+
+java
+// Ví dụ logic vòng lặp trong Simulator
+for (int i = 0; i < SimulatorConfig.REQUESTS_PER_BATCH; i++) {
+    // gửi 1 request POS
+    sendPosRequest();
+}
+// Sau khi gửi xong 1 đợt, nghỉ DELAY_SECONDS giây
+Thread.sleep(SimulatorConfig.DELAY_SECONDS * 1000L);
+Vậy ví dụ với cấu hình mặc định: mỗi đợt sẽ gửi 5 requests, rồi nghỉ 10 giây, rồi lại gửi tiếp. Bạn có muốn tôi cập nhật luôn phần code vòng lặp gửi request trong Simulator không?
+
+đã sửa để cấu hình là 1 lần gửi là có 5 request sao khi chạy lại chỉ gửi 1 request trên 1 lần
+
+Cần xem code vòng lặp chính của Simulator để tìm chỗ cần sửa:
+
+7 results
+Analyzed
+Thấy vấn đề rồi! Code hiện tại ở while(true) chỉ gửi 1 request rồi sleep. Cần thêm 1 vòng lặp inner for để gửi đủ REQUESTS_PER_BATCH requests trước khi nghỉ.
+
+Cần sửa 2 chỗ: phần header log + vòng lặp chính:
+
+Edited
++50
+-43
+Đã sửa xong! Đây là logic trước và sau:
+
+Trước (chỉ gửi 1 request/đợt):
+
+while(true) {
+    gửi 1 request  ← chỉ 1 lần
+    sleep DELAY_SECONDS
+}
+Sau (gửi đủ REQUESTS_PER_BATCH requests/đợt):
+
+while(true) {
+    lấy danh sách kho (1 lần cho cả đợt)
+    for (i = 0; i < REQUESTS_PER_BATCH; i++) {  ← lặp 5 lần
+        gửi 1 request
+    }
+    sleep DELAY_SECONDS
+}
+Output console sẽ trông như này:
+
+[INFO] ═══ BẮT ĐẦU ĐỢT GỬI (5 requests) ═══
+[INFO] --- Request #1 (Đợt 1/5) ---
+[INFO] --- Request #2 (Đợt 2/5) ---
+...
+[INFO] --- Request #5 (Đợt 5/5) ---
+[INFO] Thống kê: Thành công=5, Lỗi=0, Tổng=5
+[INFO] Đã gửi xong đợt. Nghỉ 10 giây...
+Bây giờ thay đổi REQUESTS_PER_BATCH = 5 trong 
+
+SimulatorConfig.java
+ là chạy đúng 5 requests/đợt rồi mới nghỉ 10 giây.
+

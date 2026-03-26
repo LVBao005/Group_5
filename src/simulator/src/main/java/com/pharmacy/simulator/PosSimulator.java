@@ -91,7 +91,8 @@ public class PosSimulator {
         System.out.println("Fixed Medicine: "
                 + (SimulatorConfig.IS_FIXED_MEDICINE ? "Bật (ID: " + SimulatorConfig.FIXED_MEDICINE_ID + ")"
                         : "Tắt (Ngẫu nhiên)"));
-        System.out.println("Delay Seconds:  " + SimulatorConfig.DELAY_SECONDS);
+        System.out.println("Delay Seconds:  " + SimulatorConfig.DELAY_SECONDS + "s");
+        System.out.println("Requests/Batch: " + SimulatorConfig.REQUESTS_PER_BATCH);
         System.out.println("═══════════════════════════════════════════════════════════════");
 
         // Bước 1: Đăng nhập
@@ -106,10 +107,9 @@ public class PosSimulator {
         // Main simulation loop
         while (true) {
             try {
-                requestCount++;
-                logInfo("═══ Request #" + requestCount + " ═══");
+                logInfo("═══ BẮT ĐẦU ĐỢT GỬI (" + SimulatorConfig.REQUESTS_PER_BATCH + " requests) ═══");
 
-                // Bước 2: Lấy danh sách thuốc hiện có
+                // Lấy danh sách thuốc 1 lần cho cả đợt
                 InventoryItem[] inventory = fetchInventory();
 
                 if (inventory == null || inventory.length == 0) {
@@ -118,48 +118,55 @@ public class PosSimulator {
                     continue;
                 }
 
-                // Bước 3: Chọn thuốc
-                InventoryItem selectedItem = null;
-                if (SimulatorConfig.IS_FIXED_MEDICINE) {
-                    for (InventoryItem item : inventory) {
-                        if (item.getMedicineId() == SimulatorConfig.FIXED_MEDICINE_ID) {
-                            selectedItem = item;
-                            break;
+                // Vòng lặp gửi REQUESTS_PER_BATCH requests trong 1 đợt
+                for (int batchIndex = 0; batchIndex < SimulatorConfig.REQUESTS_PER_BATCH; batchIndex++) {
+                    requestCount++;
+                    logInfo(String.format("--- Request #%d (Đợt %d/%d) ---",
+                            requestCount, batchIndex + 1, SimulatorConfig.REQUESTS_PER_BATCH));
+
+                    // Chọn thuốc
+                    InventoryItem selectedItem = null;
+                    if (SimulatorConfig.IS_FIXED_MEDICINE) {
+                        for (InventoryItem item : inventory) {
+                            if (item.getMedicineId() == SimulatorConfig.FIXED_MEDICINE_ID) {
+                                selectedItem = item;
+                                break;
+                            }
+                        }
+                        if (selectedItem == null) {
+                            logWarning("Không tìm thấy thuốc có ID " + SimulatorConfig.FIXED_MEDICINE_ID
+                                    + " trong kho. Đang chọn ngẫu nhiên...");
                         }
                     }
+
                     if (selectedItem == null) {
-                        logWarning("Không tìm thấy thuốc có ID " + SimulatorConfig.FIXED_MEDICINE_ID
-                                + " trong kho. Đang chọn ngẫu nhiên...");
+                        selectedItem = inventory[random.nextInt(inventory.length)];
+                    }
+
+                    // Chọn số lượng ngẫu nhiên (1 tới MAX_QUANTITY)
+                    int maxAvailable = Math.min(SimulatorConfig.MAX_QUANTITY, selectedItem.getQuantityStd());
+                    if (maxAvailable < 1) {
+                        logWarning("Thuốc đã chọn hết hàng: " + selectedItem.getMedicineName());
+                        continue;
+                    }
+                    int quantity = random.nextInt(maxAvailable) + 1;
+
+                    // Gửi request thanh toán
+                    boolean success = sendCheckoutRequest(selectedItem, quantity);
+
+                    if (success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
                     }
                 }
 
-                if (selectedItem == null) {
-                    selectedItem = inventory[random.nextInt(inventory.length)];
-                }
-
-                // Bước 4: Chọn số lượng ngẫu nhiên (1 tới MAX_QUANTITY)
-                int maxAvailable = Math.min(SimulatorConfig.MAX_QUANTITY, selectedItem.getQuantityStd());
-                if (maxAvailable < 1) {
-                    logWarning("Thuốc đã chọn hết hàng: " + selectedItem.getMedicineName());
-                    continue;
-                }
-                int quantity = random.nextInt(maxAvailable) + 1;
-
-                // Bước 5: Thanh toán và tạo hóa đơn
-                boolean success = sendCheckoutRequest(selectedItem, quantity);
-
-                if (success) {
-                    successCount++;
-                } else {
-                    errorCount++;
-                }
-
-                // Hiển thị thống kê
+                // Hiển thị thống kê sau mỗi đợt
                 logInfo(String.format("Thống kê: Thành công=%d, Lỗi=%d, Tổng=%d",
                         successCount, errorCount, requestCount));
 
-                // Bước 6: Nghỉ theo cài đặt
-                System.out.println();
+                // Nghỉ sau khi hoàn thành cả đợt
+                logInfo("Đã gửi xong đợt. Nghỉ " + SimulatorConfig.DELAY_SECONDS + " giây...\n");
                 Thread.sleep(SimulatorConfig.DELAY_SECONDS * 1000L);
 
             } catch (InterruptedException e) {

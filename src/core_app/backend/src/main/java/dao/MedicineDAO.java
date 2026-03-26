@@ -32,13 +32,12 @@ public class MedicineDAO {
         List<Medicine> medicines = new ArrayList<>();
         String sql = "SELECT m.*, c.category_name FROM medicines m " +
                 "JOIN categories c ON m.category_id = c.category_id " +
-                "WHERE m.name LIKE ? OR m.brand LIKE ?";
+                "WHERE m.name LIKE ?";
 
         try (Connection connection = new DBContext().getConnection();
                 PreparedStatement ps = connection.prepareStatement(sql)) {
             String pattern = "%" + query + "%";
             ps.setString(1, pattern);
-            ps.setString(2, pattern);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

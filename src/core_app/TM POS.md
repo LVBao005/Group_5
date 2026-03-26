@@ -383,4 +383,47 @@ const menuItems = [
     { icon: LayoutDashboard, label: 'Báo cáo', path: '/dashboard', roles: ['ADMIN'] },
     { icon: Package, label: 'Kho thuốc', path: '/inventory', roles: ['ADMIN'] },
 ].filter(item => item.roles.includes(user?.role || 'STAFF'));
+
+---
+
+## V. CÁC HÀM BACKEND TƯƠNG ỨNG VÀ TÍNH NĂNG HỆ THỐNG
+
+Dưới đây là các xử lý tại Backend tương ứng với các hoạt động trên giao diện POS (dựa theo phân tích từ `TM POS2.md`):
+
+### 1. Các Servlet (Controller) tiếp nhận Request
+
+| Servlet | Phương thức | Tính năng tương ứng trên POS |
+|---|---|---|
+| **InventoryServlet** | `doGet` | Gọi từ `fetchData()` để lấy danh sách thuốc, lô hàng và tồn kho khả dụng. Hỗ trợ tìm kiếm nhanh qua tham số `q`. |
+| **CustomerApiServlet** | `doGet` | Gọi từ `checkCustomer()` để tra cứu thông tin khách hàng qua số điện thoại. |
+| **CustomerApiServlet** | `doPost` | Tự động đăng ký khách hàng mới nếu SĐT chưa tồn tại trong hệ thống. |
+| **InvoiceServlet** | `doPost` | Tiếp nhận Payload từ `confirmPayment()` để thực hiện quy trình thanh toán và lưu hóa đơn. |
+
+### 2. Các hàm xử lý Logic tại DAO (Data Access Object)
+
+#### A. InvoiceDAO.java — Hàm `createInvoice()`
+Đây là "trái tim" của hệ thống xử lý thanh toán, thực hiện chuỗi hành động sau:
+- **Quản lý Transaction:** Bật `setAutoCommit(false)`, đảm bảo toàn bộ quá trình (tạo hóa đơn, trừ kho, tính điểm) phải thành công hết hoặc không làm gì cả (Rollback).
+- **Xử lý Khách hàng & Điểm:**
+    - Tự động kiểm tra SĐT; nếu khách mới sẽ tự tạo bản ghi `customers`.
+    - Tính toán `points_earned` (10đ = 1 điểm) và trừ `points_redeemed`.
+    - Gọi `CustomerDAO.updateCustomerPoints()` để cập nhật quỹ điểm của khách.
+- **Trừ kho an toàn (Race Condition):**
+    - Sử dụng `SELECT ... FOR UPDATE` để khóa dòng dữ liệu trong bảng `inventory` khi đang đọc số lượng. Việc này ngăn chặn lỗi nếu 2 nhân viên cùng bán lô thuốc cuối cùng tại 1 thời điểm.
+    - Kiểm tra lại một lần nữa `available < totalNeeded` tại Backend để đảm bảo tính toàn vẹn.
+- **Ghi log biến động kho:** Gọi `StockMovementDAO.logMovement()` để ghi lại lịch sử bán hàng với loại hình "BÁN HÀNG" và số lượng âm.
+
+#### B. InventoryDAO.java — Hàm `searchInventoryForPOS()`
+Hàm này hỗ trợ cho việc hiển thị danh sách thuốc trên POS:
+- **Lọc thuốc hết hạn:** Chỉ lấy các lô có `expiry_date >= CURDATE()`.
+- **Hỗ trợ FIFO/FEFO:** Trả về dữ liệu được sắp xếp theo `expiry_date ASC` (hạn gần nhất xếp trước) để Frontend hiển thị và phân bổ lô chính xác.
+- **Tìm kiếm đa năng:** Cho phép tìm theo tên thuốc, thương hiệu hoặc mã lô hàng.
+
+### 3. Các tính năng hệ thống cốt lõi (Core Features)
+
+1.  **Tính toàn vẹn dữ liệu (Transaction Integrity):** Đảm bảo không bao giờ có chuyện hóa đơn đã tạo nhưng kho chưa trừ hoặc khách hàng chưa được cộng điểm.
+2.  **Khóa bản ghi (Row-Level Locking):** Ngăn chặn việc bán quá số lượng thực tế khi có nhiều giao dịch đồng thời (concurrency control).
+3.  **Lịch sử biến động (Audit Trail):** Mọi viên thuốc bán ra đều được lưu vết trong bảng `stock_movements`, giúp tra cứu ai bán, bán khi nào và số lượng bao nhiêu.
+4.  **Tự động hóa khách hàng (Seamless CRM):** Quy trình "Check -> Create -> Update Points" diễn ra hoàn toàn tự động, giảm bớt thao tác cho nhân viên quầy.
+
 Tác dụng: Tự động lọc các nút trên thanh menu. Nếu đang là STAFF, sẽ tự động gỡ bỏ nút "Báo cáo" và "Kho thuốc" khỏi màn hình.

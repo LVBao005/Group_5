@@ -96,7 +96,7 @@ const POS = () => {
                         category_id: item.category_id,
                         batches: [],
                         // Add image placeholder if needed, or mapping logic
-                        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
+                        // image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400"
                     };
                 }
                 grouped[item.medicine_id].batches.push({

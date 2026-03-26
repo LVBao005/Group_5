@@ -19,6 +19,9 @@ public class SimulatorConfig {
     public static final boolean IS_FIXED_MEDICINE = true; // Bật để chỉ chọn 1 loại thuốc cố định false
     public static final int FIXED_MEDICINE_ID = 1; // ID của thuốc cố định nếu IS_FIXED_MEDICINE = true
 
-    // 4. Cấu hình thời gian
-    public static final int DELAY_SECONDS = 10; // Nghỉ bao nhiêu giây mới gửi tiếp
+    // 4. Cấu hình số lượng request mỗi lần gửi
+    public static final int REQUESTS_PER_BATCH = 2; // Số lượng request gửi trong 1 lần (1 đợt)
+
+    // 5. Cấu hình thời gian
+    public static final int DELAY_SECONDS = 10; // Nghỉ bao nhiêu giây giữa các đợt gửi
 }
