@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 $tomcatPath = "C:\Program Files\Apache Software Foundation\Tomcat 9.0"
-$warSource = "d:\LAB\Group_5\src\core_app\backend\target\backend.war"
+$warSource = "$PSScriptRoot\backend\target\backend.war"
 
 Write-Host "`n╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║          DEPLOYING BACKEND TO TOMCAT 9.0                   ║" -ForegroundColor Cyan
@@ -18,13 +18,28 @@ if (-not $isAdmin) {
 }
 
 # Step 1: Stop Tomcat
-Write-Host "⏹️  Step 1: Stopping Tomcat service..." -ForegroundColor Yellow
+Write-Host "⏹️  Step 1: Stopping Tomcat service and cleaning processes..." -ForegroundColor Yellow
 try {
-    Stop-Service -Name "Tomcat9" -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-    Write-Host "   ✓ Tomcat stopped" -ForegroundColor Green
+    # Force stop the service
+    Stop-Service -Name "Tomcat9" -Force -ErrorAction SilentlyContinue
+    Write-Host "   Waiting for resources to be released..." -ForegroundColor Gray
+    
+    # Wait for file locks to be released (5s is safer)
+    Start-Sleep -Seconds 5
+    
+    # Ensure no ghost java processes are still running from Tomcat
+    $tomcatProcess = Get-Process -Name "java" -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*Tomcat*" }
+    if ($tomcatProcess) {
+        Write-Host "   ⚠️  Found ghost Java processes, killing them..." -ForegroundColor Red
+        Stop-Process -Id $tomcatProcess.Id -Force
+    }
+
+    # Optional: Set to Manual to ensure it doesn't auto-start on Windows boot
+    Set-Service -Name "Tomcat9" -StartupType Manual -ErrorAction SilentlyContinue
+    
+    Write-Host "   ✓ Tomcat fully stopped" -ForegroundColor Green
 } catch {
-    Write-Host "   ⚠️  Tomcat was not running" -ForegroundColor DarkYellow
+    Write-Host "   ⚠️  Could not stop Tomcat service" -ForegroundColor DarkYellow
 }
 
 # Step 2: Remove old files

@@ -26,8 +26,8 @@ public class CustomerService {
 
     public boolean registerCustomer(Customer customer) throws SQLException {
         // 1. Validate phone (simple check: 10-11 digits)
-        if (customer.getPhoneNumber() == null || !customer.getPhoneNumber().matches("\\d{10,11}")) {
-            throw new IllegalArgumentException("Số điện thoại không hợp lệ (cần 10-11 chữ số)");
+        if (customer.getPhoneNumber() == null || !customer.getPhoneNumber().matches("\\d{10}")) {
+            throw new IllegalArgumentException("Số điện thoại không hợp lệ (cần đúng 10 chữ số)");
         }
 
         // 2. Check for existence

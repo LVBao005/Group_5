@@ -38,13 +38,26 @@ public class InvoiceDAO {
             conn = new DBContext().getConnection();
             conn.setAutoCommit(false); // Start transaction
 
-            // Extract invoice data
+            // Extract essential fields first
             int branchId = jsonData.get("branch_id").getAsInt();
             int pharmacistId = jsonData.get("pharmacist_id").getAsInt();
-            int subTotal = jsonData.has("sub_total") ? jsonData.get("sub_total").getAsInt() : 0;
             int discountAmount = jsonData.has("discount_amount") ? jsonData.get("discount_amount").getAsInt() : 0;
-            int totalAmount = jsonData.get("total_amount").getAsInt();
             boolean isSimulated = jsonData.has("is_simulated") ? jsonData.get("is_simulated").getAsBoolean() : false;
+
+            // Calculate totals from details first for server-side verification
+            int calculatedSubTotal = 0;
+            JsonArray details = jsonData.getAsJsonArray("details");
+            for (JsonElement detailElement : details) {
+                JsonObject detail = detailElement.getAsJsonObject();
+                int qty = detail.get("quantity_sold").getAsInt();
+                double price = detail.get("unit_price").getAsDouble();
+                calculatedSubTotal += (int) (qty * price);
+            }
+            int calculatedTotalAmount = Math.max(0, calculatedSubTotal - discountAmount);
+            
+            // Use calculated values instead of trusting frontend values
+            int finalSubTotal = calculatedSubTotal;
+            int finalTotalAmount = calculatedTotalAmount;
 
             // Handle customer: resolve by phone or create new
             Integer customerId = null;
@@ -74,7 +87,7 @@ public class InvoiceDAO {
                                 ? jsonData.get("points_redeemed").getAsInt()
                                 : 0;
                         int pointsEarned = jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                                : (int) (totalAmount / 10);
+                                : (int) (finalTotalAmount / 10);
                         int pointsDelta = pointsEarned - pointsRedeemed;
                         if (pointsDelta != 0) {
                             customerDAO.updateCustomerPoints(customerId, pointsDelta, conn);
@@ -94,12 +107,12 @@ public class InvoiceDAO {
             } else {
                 psInvoice.setNull(3, Types.INTEGER);
             }
-            psInvoice.setInt(4, subTotal);
+            psInvoice.setInt(4, finalSubTotal);
             psInvoice.setInt(5, discountAmount);
-            psInvoice.setInt(6, totalAmount);
+            psInvoice.setInt(6, finalTotalAmount);
             psInvoice.setInt(7, jsonData.has("points_redeemed") ? jsonData.get("points_redeemed").getAsInt() : 0);
             psInvoice.setInt(8, jsonData.has("points_earned") ? jsonData.get("points_earned").getAsInt()
-                    : (int) (totalAmount / 10));
+                    : (int) (finalTotalAmount / 10));
             psInvoice.setBoolean(9, isSimulated);
 
             psInvoice.executeUpdate();
@@ -111,7 +124,6 @@ public class InvoiceDAO {
             }
 
             // Insert invoice details (V15 schema: removing unit_sold, total_std_quantity)
-            JsonArray details = jsonData.getAsJsonArray("details");
             String sqlDetail = "INSERT INTO invoice_details (invoice_id, batch_id, quantity_sold, unit_price) VALUES (?, ?, ?, ?)";
             psDetail = conn.prepareStatement(sqlDetail);
 
